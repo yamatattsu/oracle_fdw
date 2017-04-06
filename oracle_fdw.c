@@ -234,7 +234,7 @@ static FdwPlan *oraclePlanForeignScan(Oid foreigntableid, PlannerInfo *root, Rel
 #else
 static void oracleGetForeignRelSize(PlannerInfo *root, RelOptInfo *baserel, Oid foreigntableid);
 static void oracleGetForeignPaths(PlannerInfo *root, RelOptInfo *baserel, Oid foreigntableid);
-static ForeignScan *oracleGetForeignPlan(PlannerInfo *root, RelOptInfo *baserel, Oid foreigntableid, ForeignPath *best_path, List *tlist, List *scan_clauses
+static ForeignScan *oracleGetForeignPlan(PlannerInfo *root, RelOptInfo *foreignrel, Oid foreigntableid, ForeignPath *best_path, List *tlist, List *scan_clauses
 #if PG_VERSION_NUM >= 90500
 , Plan *outer_plan
 #endif  /* PG_VERSION_NUM */
@@ -909,13 +909,13 @@ oracleGetForeignPaths(PlannerInfo *root, RelOptInfo *baserel, Oid foreigntableid
  * 		of parameters we need for execution.
  */
 ForeignScan
-*oracleGetForeignPlan(PlannerInfo *root, RelOptInfo *baserel, Oid foreigntableid, ForeignPath *best_path, List *tlist, List *scan_clauses
+*oracleGetForeignPlan(PlannerInfo *root, RelOptInfo *foreignrel, Oid foreigntableid, ForeignPath *best_path, List *tlist, List *scan_clauses
 #if PG_VERSION_NUM >= 90500
 , Plan *outer_plan
 #endif  /* PG_VERSION_NUM */
 )
 {
-	struct OracleFdwState *fdwState = (struct OracleFdwState *)baserel->fdw_private;
+	struct OracleFdwState *fdwState = (struct OracleFdwState *)foreignrel->fdw_private;
 	List *fdw_private, *keep_clauses = NIL;
 	ListCell *cell1, *cell2;
 	int i;
@@ -923,7 +923,7 @@ ForeignScan
 	Relation rel;
 
 	/* check if the foreign scan is for an UPDATE or DELETE */
-	if (baserel->relid == root->parse->resultRelation &&
+	if (foreignrel->relid == root->parse->resultRelation &&
 			(root->parse->commandType == CMD_UPDATE ||
 			root->parse->commandType == CMD_DELETE))
 	{
@@ -932,7 +932,7 @@ ForeignScan
 	}
 
 	/* check if FOR [KEY] SHARE/UPDATE was specified */
-	if (need_keys || get_parse_rowmark(root->parse, baserel->relid))
+	if (need_keys || get_parse_rowmark(root->parse, foreignrel->relid))
 	{
 		/* we should add FOR UPDATE */
 		for_update = true;
@@ -953,7 +953,7 @@ ForeignScan
 	rel = heap_open(foreigntableid, NoLock);
 
 	/* is there an AFTER trigger FOR EACH ROW? */
-	has_trigger = (baserel->relid == root->parse->resultRelation) && rel->trigdesc
+	has_trigger = (foreignrel->relid == root->parse->resultRelation) && rel->trigdesc
 					&& ((root->parse->commandType == CMD_UPDATE && rel->trigdesc->trig_update_after_row)
 						|| (root->parse->commandType == CMD_DELETE && rel->trigdesc->trig_delete_after_row));
 
@@ -968,7 +968,7 @@ ForeignScan
 	}
 
 	/* create remote query */
-	fdwState->query = createQuery(fdwState, baserel, for_update, best_path->path.pathkeys);
+	fdwState->query = createQuery(fdwState, foreignrel, for_update, best_path->path.pathkeys);
 	elog(DEBUG1, "oracle_fdw: remote query is: %s", fdwState->query);
 
 	/* "serialize" all necessary information for the path private area */
@@ -978,7 +978,7 @@ ForeignScan
 	foreach(cell1, scan_clauses)
 	{
 		i = 0;
-		foreach(cell2, baserel->baserestrictinfo)
+		foreach(cell2, foreignrel->baserestrictinfo)
 		{
 			if (equal(lfirst(cell1), lfirst(cell2)) && ! fdwState->pushdown_clauses[i])
 			{
@@ -993,7 +993,7 @@ ForeignScan
 	keep_clauses = extract_actual_clauses(keep_clauses, false);
 
 	/* Create the ForeignScan node */
-	return make_foreignscan(tlist, keep_clauses, baserel->relid, fdwState->params, fdw_private
+	return make_foreignscan(tlist, keep_clauses, foreignrel->relid, fdwState->params, fdw_private
 #if PG_VERSION_NUM >= 90500
 							, NIL,
 							NIL,  /* no parameterized paths */
