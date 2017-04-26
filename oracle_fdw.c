@@ -804,12 +804,10 @@ oracleGetForeignRelSize(PlannerInfo *root, RelOptInfo *baserel, Oid foreigntable
 	double ntuples = -1;
 
 	List *conditions = baserel->baserestrictinfo;
-	bool first_col = true;
 	ListCell *cell;
 	/* classify conditions */
 	List *remote_conds = NIL;
 	List *local_conds = NIL;
-	StringInfoData query;
 	char *where;
 	int clause_count = -1;
 
@@ -827,37 +825,22 @@ oracleGetForeignRelSize(PlannerInfo *root, RelOptInfo *baserel, Oid foreigntable
 		fdwState->oraTable->cols[i]->varno = baserel->relid;
 	}
 
-	/* classify remote_conds or local_conds. these parameter are used in foreign_join_ok and oracleGetForeignPlan. */
-	initStringInfo(&query);
-
 	/* allocate enough space for pushdown_clauses */
 	if (conditions != NIL)
 	{
 		fdwState->pushdown_clauses = (bool *)palloc(sizeof(bool) * list_length(conditions));
 	}
 
+	/* classify remote_conds or local_conds. these parameter are used in foreign_join_ok and oracleGetForeignPlan. */
 	foreach(cell, conditions)
 	{
 		/* classify conditions to local_conds or remote_conds */
 		where = deparseExpr(fdwState->session, baserel, ((RestrictInfo *)lfirst(cell))->clause, fdwState->oraTable, &(fdwState->params), false);
 		if (where != NULL) {
-
-			remote_conds = lappend(remote_conds, ((RestrictInfo *)lfirst(cell))->clause);
 			elog(DEBUG1, "remote_conds: %s", where);
-
-			/* append new WHERE clause to query string */
-			if (first_col)
-			{
-				first_col = false;
-				appendStringInfo(&query, " WHERE %s", where);
-			}
-			else
-			{
-				appendStringInfo(&query, " AND %s", where);
-			}
-			pfree(where);
-
+			remote_conds = lappend(remote_conds, ((RestrictInfo *)lfirst(cell))->clause);
 			fdwState->pushdown_clauses[++clause_count] = true;
+			pfree(where);
 		}
 		else
 		{
