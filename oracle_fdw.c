@@ -356,7 +356,7 @@ static char *fold_case(char *name, fold_t foldcase);
 #define REL_ALIAS_PREFIX    "r"
 /* Handy macro to add relation name qualification */
 #define ADD_REL_QUALIFIER(buf, varno)   \
-        appendStringInfo((buf), "%s%d.", REL_ALIAS_PREFIX, (varno))
+		appendStringInfo((buf), "%s%d.", REL_ALIAS_PREFIX, (varno))
 
 /*
  * Foreign-data wrapper handler function: return a struct with pointers
@@ -372,7 +372,7 @@ oracle_fdw_handler(PG_FUNCTION_ARGS)
 #else
 	fdwroutine->GetForeignRelSize = oracleGetForeignRelSize;
 	fdwroutine->GetForeignPaths = oracleGetForeignPaths;
-    fdwroutine->GetForeignJoinPaths = oracleGetForeignJoinPaths;
+	fdwroutine->GetForeignJoinPaths = oracleGetForeignJoinPaths;
 	fdwroutine->GetForeignPlan = oracleGetForeignPlan;
 	fdwroutine->AnalyzeForeignTable = oracleAnalyzeForeignTable;
 #endif  /* OLD_FDW_API */
@@ -830,11 +830,11 @@ oracleGetForeignRelSize(PlannerInfo *root, RelOptInfo *baserel, Oid foreigntable
 	/* classify remote_conds or local_conds. these parameter are used in foreign_join_ok and oracleGetForeignPlan. */
 	initStringInfo(&query);
 
-    /* allocate enough space for pushdown_clauses */
-    if (conditions != NIL)
-    {
-        fdwState->pushdown_clauses = (bool *)palloc(sizeof(bool) * list_length(conditions));
-    }
+	/* allocate enough space for pushdown_clauses */
+	if (conditions != NIL)
+	{
+		fdwState->pushdown_clauses = (bool *)palloc(sizeof(bool) * list_length(conditions));
+	}
 
 	foreach(cell, conditions)
 	{
@@ -960,7 +960,7 @@ oracleGetForeignPaths(PlannerInfo *root, RelOptInfo *baserel, Oid foreigntableid
 		 * ec_has_volatile saves some cycles.
 		 */
 		can_pushdown = !pathkey_ec->ec_has_volatile
-			    && ((em_expr = find_em_expr_for_rel(pathkey_ec, baserel)) != NULL);
+				&& ((em_expr = find_em_expr_for_rel(pathkey_ec, baserel)) != NULL);
 
 		if (can_pushdown)
 		{
@@ -968,9 +968,9 @@ oracleGetForeignPaths(PlannerInfo *root, RelOptInfo *baserel, Oid foreigntableid
 
 			/* expressions of a type different from this are not safe to push down into ORDER BY clauses */
 			if (em_type != INT8OID && em_type != INT2OID && em_type != INT4OID && em_type != OIDOID
-			        && em_type != FLOAT4OID && em_type != FLOAT8OID && em_type != NUMERICOID && em_type != DATEOID
-			        && em_type != TIMESTAMPOID && em_type != TIMESTAMPTZOID && em_type != INTERVALOID)
-			    can_pushdown = false;
+					&& em_type != FLOAT4OID && em_type != FLOAT8OID && em_type != NUMERICOID && em_type != DATEOID
+					&& em_type != TIMESTAMPOID && em_type != TIMESTAMPTZOID && em_type != INTERVALOID)
+				can_pushdown = false;
 		}
 
 		if (can_pushdown &&
@@ -984,14 +984,14 @@ oracleGetForeignPaths(PlannerInfo *root, RelOptInfo *baserel, Oid foreigntableid
 			delim = ", ";
 
 			if (pathkey->pk_strategy == BTLessStrategyNumber)
-			    appendStringInfoString(&orderedquery, " ASC");
+				appendStringInfoString(&orderedquery, " ASC");
 			else
-			    appendStringInfoString(&orderedquery, " DESC");
+				appendStringInfoString(&orderedquery, " DESC");
 
 			if (pathkey->pk_nulls_first)
-			    appendStringInfoString(&orderedquery, " NULLS FIRST");
+				appendStringInfoString(&orderedquery, " NULLS FIRST");
 			else
-			    appendStringInfoString(&orderedquery, " NULLS LAST");
+				appendStringInfoString(&orderedquery, " NULLS LAST");
 		}
 		else
 		{
@@ -1036,7 +1036,7 @@ oracleGetForeignPaths(PlannerInfo *root, RelOptInfo *baserel, Oid foreigntableid
 /*
  * oracleGetForeignJoinPaths
  *		Add possible ForeignPath to joinrel, if join is safe to push down.
- *      For now, we can only push down 2-way inner join for SELECT.
+ *		For now, we can only push down 2-way inner join for SELECT.
  */
 static void
 oracleGetForeignJoinPaths(PlannerInfo *root,
@@ -1145,7 +1145,7 @@ oracleGetForeignJoinPaths(PlannerInfo *root,
 
 	/* Currently, I don't think that a combination of JOIN pushdown and SORT pushdown. So comment out.*/
 	/* ToDo: consider cobination of join pushdown with sort pushdown
-	         and consider pathkeys for the join relation. */
+			 and consider pathkeys for the join relation. */
 	/*
 	add_paths_with_pathkeys_for_rel(root, joinrel, epq_path);
 	*/
@@ -1575,10 +1575,10 @@ oracleIterateForeignScan(ForeignScanState *node)
 		char *paramInfo = setSelectParameters(fdw_state->paramList, econtext);
 
 		/* execute the Oracle statement and fetch the first row */
-        if (node->ss.ss_currentRelation)
-            elog(DEBUG1, "oracle_fdw: execute query in foreign table scan on %d%s", RelationGetRelid(node->ss.ss_currentRelation), paramInfo);
-        else
-            elog(DEBUG1, "oracle_fdw: execute query in foreign join");
+		if (node->ss.ss_currentRelation)
+			elog(DEBUG1, "oracle_fdw: execute query in foreign table scan on %d%s", RelationGetRelid(node->ss.ss_currentRelation), paramInfo);
+		else
+			elog(DEBUG1, "oracle_fdw: execute query in foreign join");
 
 		oraclePrepareQuery(fdw_state->session, fdw_state->query, fdw_state->oraTable, fdw_state->prefetch);
 		have_result = oracleExecuteQuery(fdw_state->session, fdw_state->oraTable, fdw_state->paramList);
@@ -2842,9 +2842,9 @@ char
 #endif
 
 	/* first, find all the columns to include in the select list */
-    if (foreignrel->reloptkind == RELOPT_JOINREL)
-    {
-        elog(DEBUG1, "foreignrel->reloptkind == RELOPT_JOINREL");
+	if (foreignrel->reloptkind == RELOPT_JOINREL)
+	{
+		elog(DEBUG1, "foreignrel->reloptkind == RELOPT_JOINREL");
 	}
 	else
 	{
@@ -3086,14 +3086,14 @@ static void
 appendConditions(List *exprs, StringInfo buf, PlannerInfo *root,
 					RelOptInfo *joinrel, List **params_list)
 {
-	ListCell   *lc;
-	bool        is_first = true;
+	ListCell *lc;
+	bool is_first = true;
 	char *where;
 
 	/* Make sure any constants in the exprs are printed portably */
 	foreach(lc, exprs)
 	{
-		Expr       *expr = (Expr *) lfirst(lc);
+		Expr  *expr = (Expr *) lfirst(lc);
 
 		/* Connect expressions with "AND" and parenthesize each condition. */
 		if (!is_first)
@@ -5352,7 +5352,7 @@ foreign_join_ok(PlannerInfo *root, RelOptInfo *joinrel, JoinType jointype,
 	foreach(lc, joinclauses)
 	{
 		char *tmp = NULL;
-		Expr       *expr = (Expr *) lfirst(lc);
+		Expr *expr = (Expr *) lfirst(lc);
 
 		tmp = deparseExpr(root, fdwState->session, joinrel, expr, fdwState->oraTable, &(fdwState->params), false);
 		elog(DEBUG1, "tmp: %s", tmp);
@@ -5374,7 +5374,7 @@ foreign_join_ok(PlannerInfo *root, RelOptInfo *joinrel, JoinType jointype,
 	foreach(lc, otherclauses)
 	{
 		char *tmp = NULL;
-		Expr       *expr = (Expr *) lfirst(lc);
+		Expr *expr = (Expr *) lfirst(lc);
 		tmp = deparseExpr(root, fdwState->session, joinrel, expr, fdwState->oraTable, &(fdwState->params), false);
 		elog(DEBUG1,"tmp: %s", tmp);
 
@@ -5476,7 +5476,7 @@ foreign_join_ok(PlannerInfo *root, RelOptInfo *joinrel, JoinType jointype,
 	fdwState->oraTable->ncols = 0;
 	fdwState->oraTable->npgcols = 0;
 	fdwState->oraTable->cols = (struct oraColumn **) palloc0(sizeof(struct oraColumn*) *
-		                                           (oraTable_o->ncols + oraTable_i->ncols));
+												(oraTable_o->ncols + oraTable_i->ncols));
 
 	/*
 	 * Search oraColumn from children's oraTable.
@@ -5494,7 +5494,7 @@ foreign_join_ok(PlannerInfo *root, RelOptInfo *joinrel, JoinType jointype,
 		/* Find appropriate entry from children's oraTable. */
 		for (i=0; i<oraTable_o->ncols; ++i)
 		{
-		    struct oraColumn *tmp = oraTable_o->cols[i];
+			struct oraColumn *tmp = oraTable_o->cols[i];
 
 			if (tmp->varno == var->varno && tmp->pgattnum == var->varattno)
 			{
@@ -5571,7 +5571,7 @@ get_jointype_name(JoinType jointype)
 List *
 build_tlist_to_deparse(RelOptInfo *foreignrel)
 {
-	List       *tlist = NIL;
+	List *tlist = NIL;
 	struct OracleFdwState *fdwState = (struct OracleFdwState *)foreignrel->fdw_private;
 
 	/*
