@@ -232,9 +232,6 @@ struct OracleFdwState {
 	List       *remote_conds;
 	List       *local_conds;
 
-	/* Bitmap of attr numbers we need to fetch from the remote server. */
-	Bitmapset  *attrs_used;
-
 	/*
 	 * Name of the relation while EXPLAINing ForeignScan. It is used for join
 	 * relations but is set for all relations. For join relation, the name
@@ -1077,9 +1074,6 @@ oracleGetForeignJoinPaths(PlannerInfo *root,
 	 */
 	fdwState = (struct OracleFdwState *) palloc0(sizeof(struct OracleFdwState));
 	fdwState->pushdown_safe = false;
-
-	/* attrs_used is only for base relations. */
-	fdwState->attrs_used = NULL;
 
 	joinrel->fdw_private = fdwState;
 
