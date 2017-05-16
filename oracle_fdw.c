@@ -822,6 +822,9 @@ oracleGetForeignRelSize(PlannerInfo *root, RelOptInfo *baserel, Oid foreigntable
 		fdwState->oraTable->cols[i]->varno = baserel->relid;
 	}
 
+	/* Base foreign tables need to be push down always. */
+	fdwState->pushdown_safe = true;
+
 	/* allocate enough space for pushdown_clauses */
 	if (conditions != NIL)
 	{
