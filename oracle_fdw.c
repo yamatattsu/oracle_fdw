@@ -203,7 +203,6 @@ struct OracleFdwState {
 	struct oraTable *oraTable;     /* description of the remote Oracle table */
 	Cost startup_cost;             /* cost estimate, only needed for planning */
 	Cost total_cost;               /* cost estimate, only needed for planning */
-	bool *pushdown_clauses;        /* array, true if the corresponding clause can be pushed down */
 	unsigned long rowcount;        /* rows already read from Oracle */
 	int columnindex;               /* currently processed column for error context */
 	MemoryContext temp_cxt;        /* short-lived memory for data modification */
@@ -806,7 +805,6 @@ oracleGetForeignRelSize(PlannerInfo *root, RelOptInfo *baserel, Oid foreigntable
 	List *remote_conds = NIL;
 	List *local_conds = NIL;
 	char *where;
-	int clause_count = -1;
 
 	RangeTblEntry *rte = planner_rt_fetch(baserel->relid, root);
 	/* const char *namespace; */
@@ -825,12 +823,6 @@ oracleGetForeignRelSize(PlannerInfo *root, RelOptInfo *baserel, Oid foreigntable
 	/* Base foreign tables need to be push down always. */
 	fdwState->pushdown_safe = true;
 
-	/* allocate enough space for pushdown_clauses */
-	if (conditions != NIL)
-	{
-		fdwState->pushdown_clauses = (bool *)palloc(sizeof(bool) * list_length(conditions));
-	}
-
 	/* classify remote_conds or local_conds. these parameter are used in foreign_join_ok and oracleGetForeignPlan. */
 	foreach(cell, conditions)
 	{
@@ -839,13 +831,11 @@ oracleGetForeignRelSize(PlannerInfo *root, RelOptInfo *baserel, Oid foreigntable
 		if (where != NULL) {
 			elog(DEBUG1, "remote_conds: %s", where);
 			remote_conds = lappend(remote_conds, ((RestrictInfo *)lfirst(cell))->clause);
-			fdwState->pushdown_clauses[++clause_count] = true;
 			pfree(where);
 		}
 		else
 		{
 			local_conds = lappend(local_conds, ((RestrictInfo *)lfirst(cell))->clause);
-			fdwState->pushdown_clauses[++clause_count] = false;
 		}
 	}
 
@@ -1144,8 +1134,7 @@ ForeignScan
 #endif  /* PG_VERSION_NUM */
 )
 {
-	List *fdw_private, *keep_clauses = NIL;
-	ListCell *cell1, *cell2;
+	List *fdw_private = NIL;
 	int i;
 	bool need_keys = false, for_update = false, has_trigger;
 	Relation rel;
@@ -1223,24 +1212,6 @@ ForeignScan
 		/* "serialize" all necessary information for the path private area */
 		fdw_private = serializePlanData(fdwState);
 
-		/* keep only those clauses that are not handled by Oracle */
-		foreach(cell1, scan_clauses)
-		{
-			i = 0;
-			foreach(cell2, foreignrel->baserestrictinfo)
-			{
-				if (equal(lfirst(cell1), lfirst(cell2)) && ! fdwState->pushdown_clauses[i])
-				{
-					keep_clauses = lcons(lfirst(cell1), keep_clauses);
-					break;
-				}
-				++i;
-			}
-		}
-
-		/* remove the RestrictInfo node from all remaining clauses */
-		keep_clauses = extract_actual_clauses(keep_clauses, false);
-
 		/*
 		 * Separate the scan_clauses into those that can be executed remotely and
 		 * those that can't.  baserestrictinfo clauses that were previously
@@ -1289,7 +1260,7 @@ ForeignScan
 		}
 
 		/* Create the ForeignScan node */
-		return make_foreignscan(tlist, keep_clauses, scan_relid, fdwState->params, fdw_private
+		return make_foreignscan(tlist, local_exprs, scan_relid, fdwState->params, fdw_private
 #if PG_VERSION_NUM >= 90500
 								, NIL,
 								NIL,  /* no parameterized paths */
@@ -2615,7 +2586,6 @@ struct OracleFdwState
 	fdwState->password = NULL;
 	fdwState->params = NIL;
 	fdwState->paramList = NULL;
-	fdwState->pushdown_clauses = NULL;
 	fdwState->temp_cxt = NULL;
 	fdwState->order_clause = NULL;
 
@@ -2803,16 +2773,13 @@ getColumnData(Oid foreigntableid, struct oraTable *oraTable)
  * 		Untranslatable clauses are omitted and left for PostgreSQL to check.
  * 		"query_pathkeys" contains the desired sort order of the scan results
  * 		which will be translated to ORDER BY clauses if possible.
- * 		In "fdwState->pushdown_clauses" an array is stored that contains "true" for all
- * 		clauses that will be pushed down and "false" for those that are filtered locally.
- * 		As a side effect, we also mark the used columns in oraTable.
  */
 char
 *createQuery(struct OracleFdwState *fdwState, RelOptInfo *foreignrel, bool modify, List *query_pathkeys)
 {
 	ListCell *cell;
 	bool first_col = true, in_quote = false;
-	int i, clause_count = -1, index;
+	int i, index;
 	char *where, *wherecopy, *p, md5[33], parname[10];
 	StringInfoData query, result;
 	List *columnlist,
@@ -2881,6 +2848,7 @@ char
 			}
 		}
 	}
+
 	/* dummy column if there is no result column we need from Oracle */
 	if (first_col)
 		appendStringInfo(&query, "'1'");
@@ -2896,12 +2864,6 @@ char
 	else
 	{
 		appendStringInfo(&query, " FROM %s", fdwState->oraTable->name);
-
-		/* allocate enough space for pushdown_clauses */
-		if (conditions != NIL)
-		{
-			fdwState->pushdown_clauses = (bool *)palloc(sizeof(bool) * list_length(conditions));
-		}
 
 		/* append WHERE clauses */
 		first_col = true;
@@ -2921,11 +2883,7 @@ char
 					appendStringInfo(&query, " AND %s", where);
 				}
 				pfree(where);
-
-				fdwState->pushdown_clauses[++clause_count] = true;
 			}
-			else
-				fdwState->pushdown_clauses[++clause_count] = false;
 		}
 	}
 
@@ -3130,7 +3088,6 @@ acquireSampleRowsFunc(Relation relation, int elevel, HeapTuple *rows, int targro
 	/* get connection options, connect and get the remote table description */
 	fdw_state = getFdwState(RelationGetRelid(relation), &sample_percent);
 	fdw_state ->paramList = NULL;
-	fdw_state->pushdown_clauses = NULL;
 	fdw_state->rowcount = 0;
 
 	/* construct query */
@@ -4898,7 +4855,7 @@ List
 		result = lappend(result, serializeInt((int)param->colnum));
 		/* don't serialize value, node and bindh */
 	}
-	/* don't serialize params, startup_cost, total_cost, pushdown_clauses, rowcount, columnindex, temp_cxt and order_clause */
+	/* don't serialize params, startup_cost, total_cost, rowcount, columnindex, temp_cxt and order_clause */
 
 	return result;
 }
@@ -4955,7 +4912,6 @@ struct OracleFdwState
 	/* these fields are not needed during execution */
 	state->startup_cost = 0;
 	state->total_cost = 0;
-	state->pushdown_clauses = NULL;
 	/* these are not serialized */
 	state->rowcount = 0;
 	state->columnindex = 0;
@@ -5619,7 +5575,6 @@ struct OracleFdwState
 	}
 	copy->startup_cost = 0.0;
 	copy->total_cost = 0.0;
-	copy->pushdown_clauses = NULL;
 	copy->rowcount = 0;
 	copy->columnindex = 0;
 	copy->temp_cxt = NULL;
