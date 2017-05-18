@@ -1144,6 +1144,20 @@ ForeignScan
 #endif  /* PG_VERSION_NUM */
 )
 {
+	List *fdw_private, *keep_clauses = NIL;
+	ListCell *cell1, *cell2;
+	int i;
+	bool need_keys = false, for_update = false, has_trigger;
+	Relation rel;
+	Index scan_relid;
+	List *local_exprs = NIL;
+	List *remote_conds = NIL;
+	List *remote_exprs = NIL;
+	List *params_list = NIL;
+	/*List *retrieved_attrs;*/
+	ListCell   *lc;
+	List       *fdw_scan_tlist = NIL;
+
 	struct OracleFdwState *fdwState = (struct OracleFdwState *)foreignrel->fdw_private;
 
 	/* I added the code for RELOPT_JOINREL and divided process according to foreign.reloptkind */
@@ -1155,11 +1169,7 @@ ForeignScan
 		foreignrel->reloptkind == RELOPT_OTHER_MEMBER_REL)
 	{
 
-		List *fdw_private, *keep_clauses = NIL;
-		ListCell *cell1, *cell2;
-		int i;
-		bool need_keys = false, for_update = false, has_trigger;
-		Relation rel;
+		scan_relid = foreignrel->relid;
 
 		/* check if the foreign scan is for an UPDATE or DELETE */
 		if (foreignrel->relid == root->parse->resultRelation &&
@@ -1231,38 +1241,6 @@ ForeignScan
 		/* remove the RestrictInfo node from all remaining clauses */
 		keep_clauses = extract_actual_clauses(keep_clauses, false);
 
-		/* Create the ForeignScan node */
-		return make_foreignscan(tlist, keep_clauses, foreignrel->relid, fdwState->params, fdw_private
-#if PG_VERSION_NUM >= 90500
-								, NIL,
-								NIL,  /* no parameterized paths */
-								outer_plan
-#endif  /* PG_VERSION_NUM */
-								);
-	}
-	else
-	{	/* foreignrel->reloptkind == RELOPT_JOINREL */
-		Index scan_relid;
-		List *fdw_private;
-		List *local_exprs = NIL; 
-		List *remote_conds = NIL;
-		List *remote_exprs = NIL;
-		List *params_list = NIL;
-		/*List *retrieved_attrs;*/
-		ListCell   *lc;
-		List       *fdw_scan_tlist = NIL;
-
-		scan_relid = 0;
-
-		/*
-		 * create_scan_plan() and create_foreignscan_plan() pass
-		 * rel->baserestrictinfo + parameterization clauses through
-		 * scan_clauses. For a join rel->baserestrictinfo is NIL and we are
-		 * not considering parameterization right now, so there should be no
-		 * scan_clauses for a joinrel.
-		 */
-		Assert(!scan_clauses);
-
 		/*
 		 * Separate the scan_clauses into those that can be executed remotely and
 		 * those that can't.  baserestrictinfo clauses that were previously
@@ -1282,6 +1260,7 @@ ForeignScan
 		 * remote_conds list, since appendWhereClause expects a list of
 		 * RestrictInfos.
 		 */
+
 		foreach(lc, scan_clauses)
 		{
 			RestrictInfo *rinfo = (RestrictInfo *) lfirst(lc);
@@ -1289,6 +1268,7 @@ ForeignScan
 			Assert(IsA(rinfo, RestrictInfo));
 
 			/* Ignore any pseudoconstants, they're dealt with elsewhere */
+
 			if (rinfo->pseudoconstant)
 				continue;
 
@@ -1308,66 +1288,89 @@ ForeignScan
 				local_exprs = lappend(local_exprs, rinfo->clause);
 		}
 
-		/* For a join relation, get the conditions from fdw_private structure */
-		remote_conds = fdwState->remote_conds;
-		local_exprs = fdwState->local_conds;
-
-		/* Build the list of columns to be fetched from the foreign server. */
-		fdw_scan_tlist = build_tlist_to_deparse(foreignrel);
-
-		/*
-		 * Ensure that the outer plan produces a tuple whose descriptor
-		 * matches our scan tuple slot. This is safe because all scans and
-		 * joins support projection, so we never need to insert a Result node.
-		 * Also, remove the local conditions from outer plan's quals, lest
-		 * they will be evaluated twice, once by the local plan and once by
-		 * the scan.
-		 */
-		if (outer_plan)
-		{
-			ListCell   *lc;
-
-			outer_plan->targetlist = fdw_scan_tlist;
-
-			foreach(lc, local_exprs)
-			{
-				Join       *join_plan = (Join *) outer_plan;
-				Node       *qual = lfirst(lc);
-
-				outer_plan->qual = list_delete(outer_plan->qual, qual);
-
-				/*
-				 * For an inner join the local conditions of foreign scan plan
-				 * can be part of the joinquals as well.
-				 */
-				if (join_plan->jointype == JOIN_INNER)
-					join_plan->joinqual = list_delete(join_plan->joinqual,
-													  qual);
-			}
-		}
-
-		/* createQuery for join relation */
-		fdwState->query = createQuery(fdwState, foreignrel, false, NULL);
-		elog(DEBUG1, "oracleGetForeignPlan fdwState->query   : %s", fdwState->query);
-
-		fdw_private = serializePlanData(fdwState);
-
-		/*
-		 * Create the ForeignScan node for the given relation.
-		 *
-		 * Note that the remote parameter expressions are stored in the fdw_exprs
-		 * field of the finished plan node; we can't keep them in private state
-		 * because then they wouldn't be subject to later planner processing.
-		 */
-		return make_foreignscan(tlist,
-								local_exprs,
-								scan_relid,
-								params_list,
-								fdw_private,
-								fdw_scan_tlist,
-								remote_exprs,
-								outer_plan);
+		/* Create the ForeignScan node */
+		return make_foreignscan(tlist, keep_clauses, scan_relid, fdwState->params, fdw_private
+#if PG_VERSION_NUM >= 90500
+								, NIL,
+								NIL,  /* no parameterized paths */
+								outer_plan
+#endif  /* PG_VERSION_NUM */
+								);
 	}
+	else
+	{	/* foreignrel->reloptkind == RELOPT_JOINREL */
+
+		scan_relid = 0;
+
+		/*
+		 * create_scan_plan() and create_foreignscan_plan() pass
+		 * rel->baserestrictinfo + parameterization clauses through
+		 * scan_clauses. For a join rel->baserestrictinfo is NIL and we are
+		 * not considering parameterization right now, so there should be no
+		 * scan_clauses for a joinrel.
+		 */
+		Assert(!scan_clauses);
+	}
+
+	/* For a join relation, get the conditions from fdw_private structure */
+	remote_conds = fdwState->remote_conds;
+	local_exprs = fdwState->local_conds;
+
+	/* Build the list of columns to be fetched from the foreign server. */
+	fdw_scan_tlist = build_tlist_to_deparse(foreignrel);
+
+	/*
+	 * Ensure that the outer plan produces a tuple whose descriptor
+	 * matches our scan tuple slot. This is safe because all scans and
+	 * joins support projection, so we never need to insert a Result node.
+	 * Also, remove the local conditions from outer plan's quals, lest
+	 * they will be evaluated twice, once by the local plan and once by
+	 * the scan.
+	 */
+	if (outer_plan)
+	{
+		ListCell   *lc;
+
+		outer_plan->targetlist = fdw_scan_tlist;
+
+		foreach(lc, local_exprs)
+		{
+			Join       *join_plan = (Join *) outer_plan;
+			Node       *qual = lfirst(lc);
+
+			outer_plan->qual = list_delete(outer_plan->qual, qual);
+
+			/*
+			 * For an inner join the local conditions of foreign scan plan
+			 * can be part of the joinquals as well.
+			 */
+			if (join_plan->jointype == JOIN_INNER)
+				join_plan->joinqual = list_delete(join_plan->joinqual,
+												  qual);
+		}
+	}
+
+	/* createQuery for join relation */
+	fdwState->query = createQuery(fdwState, foreignrel, false, NULL);
+	elog(DEBUG1, "oracleGetForeignPlan fdwState->query   : %s", fdwState->query);
+
+	fdw_private = serializePlanData(fdwState);
+
+	/*
+	 * Create the ForeignScan node for the given relation.
+	 *
+	 * Note that the remote parameter expressions are stored in the fdw_exprs
+	 * field of the finished plan node; we can't keep them in private state
+	 * because then they wouldn't be subject to later planner processing.
+	 */
+	return make_foreignscan(tlist,
+							local_exprs,
+							scan_relid,
+							params_list,
+							fdw_private,
+							fdw_scan_tlist,
+							remote_exprs,
+							outer_plan);
 }
 
 
