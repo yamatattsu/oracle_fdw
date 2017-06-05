@@ -5066,6 +5066,7 @@ deparseTimestamp(Datum datum, bool hasTimezone)
 			datetime_tm.tm_min, datetime_tm.tm_sec, (int32)datetime_fsec,
 			(datetime_tm.tm_year > 0) ? "AD" : "BC");
 
+elog(DEBUG1, "deparseTimestamp s.data: %s", s.data);
 	return s.data;
 }
 
@@ -5108,6 +5109,8 @@ char
 
 	initStringInfo(&s);
 	appendStringInfo(&s, "INTERVAL '%s%d %02d:%02d:%02d.%06d' DAY(9) TO SECOND(6)", sign, tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec, fsec);
+
+elog(DEBUG1, "deparseInterval s.data: %s", s.data);
 
 	return s.data;
 }
@@ -5216,16 +5219,31 @@ foreign_join_ok(PlannerInfo *root, RelOptInfo *joinrel, JoinType jointype,
 	 */
 	foreach(lc, otherclauses)
 	{
+		bool can_pushdown = true;
+		Oid type;
 		char *tmp = NULL;
 		Expr *expr = (Expr *) lfirst(lc);
-		tmp = deparseExpr(fdwState->session, joinrel, expr, fdwState->oraTable, &(fdwState->params), false);
-		elog(DEBUG1,"tmp: %s", tmp);
 
-		if (tmp == NULL)
-			fdwState->local_conds = lappend(fdwState->local_conds, expr);
+		type = exprType((Node *)expr);
+		if (type != INT8OID && type != INT2OID && type != INT4OID && type != OIDOID
+				&& type != FLOAT4OID && type != FLOAT8OID && type != NUMERICOID && type != DATEOID
+				&& type != TIMESTAMPOID && type != TIMESTAMPTZOID && type != INTERVALOID)
+		{
+			can_pushdown = false;
+		}
+		
+		tmp = deparseExpr(fdwState->session, joinrel, expr, fdwState->oraTable, &(fdwState->params), false);
+		elog(DEBUG1,"otherclauses tmp: %s", tmp);
+		elog(DEBUG1,"can_pushdown: %d", can_pushdown);
+
+		if (can_pushdown == false && tmp == NULL)
+				fdwState->local_conds = lappend(fdwState->local_conds, expr);
 		else
-			fdwState->remote_conds = lappend(fdwState->remote_conds, expr);
+				fdwState->remote_conds = lappend(fdwState->remote_conds, expr);
 	}
+
+	if(fdwState->remote_conds == NIL)
+		return false;
 
 	/*
 	 * Pull the other remote conditions from the joining relations into join

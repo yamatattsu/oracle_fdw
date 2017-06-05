@@ -1,7 +1,7 @@
 /*
  * Test JOIN pushdown
 
-Note: Create typetest2 on Oracle before execute this regression test.
+Note: Create typetest2 and typetest3 on Oracle before execute this regression test.
 
 CREATE TABLE scott.typetest2 (
    id  NUMBER(5)
@@ -25,6 +25,27 @@ CREATE TABLE scott.typetest2 (
    iym INTERVAL YEAR TO MONTH
 ) SEGMENT CREATION IMMEDIATE;
 
+CREATE TABLE scott.typetest3 (
+   id  NUMBER(5)
+      CONSTRAINT typetest3_pkey PRIMARY KEY,
+   c   CHAR(10 CHAR),
+   nc  NCHAR(10),
+   vc  VARCHAR2(10 CHAR),
+   nvc NVARCHAR2(10),
+   lc  CLOB,
+   r   RAW(10),
+   u   RAW(16),
+   lb  BLOB,
+   lr  LONG RAW,
+   b   NUMBER(1),
+   num NUMBER(7,5),
+   fl  BINARY_FLOAT,
+   db  BINARY_DOUBLE,
+   d   DATE,
+   ts  TIMESTAMP WITH TIME ZONE,
+   ids INTERVAL DAY TO SECOND,
+   iym INTERVAL YEAR TO MONTH
+) SEGMENT CREATION IMMEDIATE;
  */
 SET client_min_messages = WARNING;
 CREATE FOREIGN TABLE typetest2 (
@@ -181,6 +202,20 @@ ids | @ 23 hours 59 mins 59.999999 secs
 iym | @ 3 years
 
 \x
+/* Pushdown: OK */
+/* Inner join */
+EXPLAIN (VERBOSE on, COSTS off) SELECT t1.id, t2.id FROM typetest1 t1, typetest2 t2 WHERE t1.id = t2.id;
+                                                                       QUERY PLAN                                                                        
+---------------------------------------------------------------------------------------------------------------------------------------------------------
+ Foreign Scan
+   Output: t1.id, t2.id
+   Oracle query: SELECT /*57b3f07123bbcd736ad43dc7465b22eb*/ r1."ID", r2."ID" FROM ("TYPETEST1" r1 INNER JOIN "TYPETEST2" r2 ON (((r1."ID" = r2."ID"))))
+   Oracle plan: SELECT STATEMENT
+   Oracle plan:   NESTED LOOPS
+   Oracle plan:     TABLE ACCESS FULL TYPETEST1
+   Oracle plan:     INDEX UNIQUE SCAN TYPETEST2_PKEY (condition "R1"."ID"="R2"."ID")
+(7 rows)
+
 EXPLAIN (VERBOSE on, COSTS off) SELECT t1.id, t2.id FROM typetest1 t1, typetest2 t2 WHERE t1.c = t2.c;
                                                                       QUERY PLAN                                                                       
 -------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -229,24 +264,6 @@ EXPLAIN (VERBOSE on, COSTS off) SELECT t1.id, t2.id FROM typetest1 t1, typetest2
    Oracle plan:     TABLE ACCESS FULL TYPETEST2
 (7 rows)
 
-EXPLAIN (VERBOSE on, COSTS off) SELECT t1.id, t2.id FROM typetest1 t1, typetest2 t2 WHERE t1.lc = t2.lc;
-ERROR:  error describing query: OCIStmtExecute failed to describe remote query
-DETAIL:  ORA-00932: inconsistent datatypes: expected - got CLOB
-EXPLAIN (VERBOSE on, COSTS off) SELECT t1.id, t2.id FROM typetest1 t1, typetest2 t2 WHERE t1.r = t2.r;
-ERROR:  error describing query: OCIStmtExecute failed to describe remote query
-DETAIL:  ORA-00920: invalid relational operator
-EXPLAIN (VERBOSE on, COSTS off) SELECT t1.id, t2.id FROM typetest1 t1, typetest2 t2 WHERE t1.u = t2.u;
-ERROR:  error describing query: OCIStmtExecute failed to describe remote query
-DETAIL:  ORA-00920: invalid relational operator
-EXPLAIN (VERBOSE on, COSTS off) SELECT t1.id, t2.id FROM typetest1 t1, typetest2 t2 WHERE t1.lb = t2.lb;
-ERROR:  error describing query: OCIStmtExecute failed to describe remote query
-DETAIL:  ORA-00920: invalid relational operator
-EXPLAIN (VERBOSE on, COSTS off) SELECT t1.id, t2.id FROM typetest1 t1, typetest2 t2 WHERE t1.lr = t2.lr;
-ERROR:  error describing query: OCIStmtExecute failed to describe remote query
-DETAIL:  ORA-00920: invalid relational operator
-EXPLAIN (VERBOSE on, COSTS off) SELECT t1.id, t2.id FROM typetest1 t1, typetest2 t2 WHERE t1.b = t2.b;
-ERROR:  error describing query: OCIStmtExecute failed to describe remote query
-DETAIL:  ORA-00920: invalid relational operator
 EXPLAIN (VERBOSE on, COSTS off) SELECT t1.id, t2.id FROM typetest1 t1, typetest2 t2 WHERE t1.num = t2.num;
                                                                         QUERY PLAN                                                                         
 -----------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -307,12 +324,14 @@ EXPLAIN (VERBOSE on, COSTS off) SELECT t1.id, t2.id FROM typetest1 t1, typetest2
    Oracle plan:     TABLE ACCESS FULL TYPETEST2
 (7 rows)
 
-EXPLAIN (VERBOSE on, COSTS off) SELECT t1.id, t2.id FROM typetest1 t1, typetest2 t2 WHERE t1.ids = t2.ids;
-ERROR:  error describing query: OCIStmtExecute failed to describe remote query
-DETAIL:  ORA-00920: invalid relational operator
-EXPLAIN (VERBOSE on, COSTS off) SELECT t1.id, t2.id FROM typetest1 t1, typetest2 t2 WHERE t1.iym = t2.iym;
-ERROR:  error describing query: OCIStmtExecute failed to describe remote query
-DETAIL:  ORA-00920: invalid relational operator
+SELECT t1.id, t2.id FROM typetest1 t1, typetest2 t2 WHERE t1.id = t2.id;
+ id | id 
+----+----
+  3 |  3
+  4 |  4
+  1 |  1
+(3 rows)
+
 SELECT t1.id, t2.id FROM typetest1 t1, typetest2 t2 WHERE t1.c = t2.c;
  id | id 
 ----+----
@@ -345,24 +364,6 @@ SELECT t1.id, t2.id FROM typetest1 t1, typetest2 t2 WHERE t1.nvc = t2.nvc;
   1 |  1
 (3 rows)
 
-SELECT t1.id, t2.id FROM typetest1 t1, typetest2 t2 WHERE t1.lc = t2.lc;
-ERROR:  error executing query: OCIStmtExecute failed to execute remote query
-DETAIL:  ORA-00932: inconsistent datatypes: expected - got CLOB
-SELECT t1.id, t2.id FROM typetest1 t1, typetest2 t2 WHERE t1.r = t2.r;
-ERROR:  error executing query: OCIStmtExecute failed to execute remote query
-DETAIL:  ORA-00920: invalid relational operator
-SELECT t1.id, t2.id FROM typetest1 t1, typetest2 t2 WHERE t1.u = t2.u;
-ERROR:  error executing query: OCIStmtExecute failed to execute remote query
-DETAIL:  ORA-00920: invalid relational operator
-SELECT t1.id, t2.id FROM typetest1 t1, typetest2 t2 WHERE t1.lb = t2.lb;
-ERROR:  error executing query: OCIStmtExecute failed to execute remote query
-DETAIL:  ORA-00920: invalid relational operator
-SELECT t1.id, t2.id FROM typetest1 t1, typetest2 t2 WHERE t1.lr = t2.lr;
-ERROR:  error executing query: OCIStmtExecute failed to execute remote query
-DETAIL:  ORA-00920: invalid relational operator
-SELECT t1.id, t2.id FROM typetest1 t1, typetest2 t2 WHERE t1.b = t2.b;
-ERROR:  error executing query: OCIStmtExecute failed to execute remote query
-DETAIL:  ORA-00920: invalid relational operator
 SELECT t1.id, t2.id FROM typetest1 t1, typetest2 t2 WHERE t1.num = t2.num;
  id | id 
 ----+----
@@ -401,10 +402,403 @@ SELECT t1.id, t2.id FROM typetest1 t1, typetest2 t2 WHERE t1.ts = t2.ts;
   1 |  1
 (2 rows)
 
+/* Pushdown: NG */
+/* Inner join */
+EXPLAIN (VERBOSE on, COSTS off) SELECT t1.id, t2.id FROM typetest1 t1, typetest2 t2 WHERE t1.lc = t2.lc;
+ERROR:  error describing query: OCIStmtExecute failed to describe remote query
+DETAIL:  ORA-00932: inconsistent datatypes: expected - got CLOB
+EXPLAIN (VERBOSE on, COSTS off) SELECT t1.id, t2.id FROM typetest1 t1, typetest2 t2 WHERE t1.r = t2.r;
+                                             QUERY PLAN                                             
+----------------------------------------------------------------------------------------------------
+ Hash Join
+   Output: t1.id, t2.id
+   Hash Cond: (t1.r = t2.r)
+   ->  Foreign Scan on public.typetest1 t1
+         Output: t1.id, t1.r
+         Oracle query: SELECT /*0c9fa21440d92d95e83dcb1672e0737c*/ "ID", "R" FROM "TYPETEST1"
+         Oracle plan: SELECT STATEMENT
+         Oracle plan:   TABLE ACCESS FULL TYPETEST1
+   ->  Hash
+         Output: t2.id, t2.r
+         ->  Foreign Scan on public.typetest2 t2
+               Output: t2.id, t2.r
+               Oracle query: SELECT /*a5233cf2478338eaf2a9f54608a3425f*/ "ID", "R" FROM "TYPETEST2"
+               Oracle plan: SELECT STATEMENT
+               Oracle plan:   TABLE ACCESS FULL TYPETEST2
+(15 rows)
+
+EXPLAIN (VERBOSE on, COSTS off) SELECT t1.id, t2.id FROM typetest1 t1, typetest2 t2 WHERE t1.u = t2.u;
+                                             QUERY PLAN                                             
+----------------------------------------------------------------------------------------------------
+ Hash Join
+   Output: t1.id, t2.id
+   Hash Cond: (t1.u = t2.u)
+   ->  Foreign Scan on public.typetest1 t1
+         Output: t1.id, t1.u
+         Oracle query: SELECT /*ffae5bd6ad5bf1cf7817c59bfeb96ee3*/ "ID", "U" FROM "TYPETEST1"
+         Oracle plan: SELECT STATEMENT
+         Oracle plan:   TABLE ACCESS FULL TYPETEST1
+   ->  Hash
+         Output: t2.id, t2.u
+         ->  Foreign Scan on public.typetest2 t2
+               Output: t2.id, t2.u
+               Oracle query: SELECT /*9c5898262b3891b1e1d79bceb514f860*/ "ID", "U" FROM "TYPETEST2"
+               Oracle plan: SELECT STATEMENT
+               Oracle plan:   TABLE ACCESS FULL TYPETEST2
+(15 rows)
+
+EXPLAIN (VERBOSE on, COSTS off) SELECT t1.id, t2.id FROM typetest1 t1, typetest2 t2 WHERE t1.lb = t2.lb;
+                                             QUERY PLAN                                              
+-----------------------------------------------------------------------------------------------------
+ Hash Join
+   Output: t1.id, t2.id
+   Hash Cond: (t1.lb = t2.lb)
+   ->  Foreign Scan on public.typetest1 t1
+         Output: t1.id, t1.lb
+         Oracle query: SELECT /*6dc461b76247fbb553df564450096618*/ "ID", "LB" FROM "TYPETEST1"
+         Oracle plan: SELECT STATEMENT
+         Oracle plan:   TABLE ACCESS FULL TYPETEST1
+   ->  Hash
+         Output: t2.id, t2.lb
+         ->  Foreign Scan on public.typetest2 t2
+               Output: t2.id, t2.lb
+               Oracle query: SELECT /*62b3a5e0f6ff5cd029564e75c75446b7*/ "ID", "LB" FROM "TYPETEST2"
+               Oracle plan: SELECT STATEMENT
+               Oracle plan:   TABLE ACCESS FULL TYPETEST2
+(15 rows)
+
+EXPLAIN (VERBOSE on, COSTS off) SELECT t1.id, t2.id FROM typetest1 t1, typetest2 t2 WHERE t1.lr = t2.lr;
+                                             QUERY PLAN                                              
+-----------------------------------------------------------------------------------------------------
+ Hash Join
+   Output: t1.id, t2.id
+   Hash Cond: (t1.lr = t2.lr)
+   ->  Foreign Scan on public.typetest1 t1
+         Output: t1.id, t1.lr
+         Oracle query: SELECT /*faecebda86509ce0a9a1ef78d2194162*/ "ID", "LR" FROM "TYPETEST1"
+         Oracle plan: SELECT STATEMENT
+         Oracle plan:   TABLE ACCESS FULL TYPETEST1
+   ->  Hash
+         Output: t2.id, t2.lr
+         ->  Foreign Scan on public.typetest2 t2
+               Output: t2.id, t2.lr
+               Oracle query: SELECT /*a89877f481a22ffd4525f4b0624d57f1*/ "ID", "LR" FROM "TYPETEST2"
+               Oracle plan: SELECT STATEMENT
+               Oracle plan:   TABLE ACCESS FULL TYPETEST2
+(15 rows)
+
+EXPLAIN (VERBOSE on, COSTS off) SELECT t1.id, t2.id FROM typetest1 t1, typetest2 t2 WHERE t1.b = t2.b;
+                                             QUERY PLAN                                             
+----------------------------------------------------------------------------------------------------
+ Hash Join
+   Output: t1.id, t2.id
+   Hash Cond: (t1.b = t2.b)
+   ->  Foreign Scan on public.typetest1 t1
+         Output: t1.id, t1.b
+         Oracle query: SELECT /*6abe344527b0c16deb1a2a81a45c8659*/ "ID", "B" FROM "TYPETEST1"
+         Oracle plan: SELECT STATEMENT
+         Oracle plan:   TABLE ACCESS FULL TYPETEST1
+   ->  Hash
+         Output: t2.id, t2.b
+         ->  Foreign Scan on public.typetest2 t2
+               Output: t2.id, t2.b
+               Oracle query: SELECT /*24422dc7b463712d9458e19b90ac7144*/ "ID", "B" FROM "TYPETEST2"
+               Oracle plan: SELECT STATEMENT
+               Oracle plan:   TABLE ACCESS FULL TYPETEST2
+(15 rows)
+
+EXPLAIN (VERBOSE on, COSTS off) SELECT t1.id, t2.id FROM typetest1 t1, typetest2 t2 WHERE t1.ids = t2.ids;
+                                              QUERY PLAN                                              
+------------------------------------------------------------------------------------------------------
+ Hash Join
+   Output: t1.id, t2.id
+   Hash Cond: (t1.ids = t2.ids)
+   ->  Foreign Scan on public.typetest1 t1
+         Output: t1.id, t1.ids
+         Oracle query: SELECT /*647f56c7d583b7a086f914b26c50982b*/ "ID", "IDS" FROM "TYPETEST1"
+         Oracle plan: SELECT STATEMENT
+         Oracle plan:   TABLE ACCESS FULL TYPETEST1
+   ->  Hash
+         Output: t2.id, t2.ids
+         ->  Foreign Scan on public.typetest2 t2
+               Output: t2.id, t2.ids
+               Oracle query: SELECT /*6a2ef5f1a4e55fcb6503399ca64fb9bd*/ "ID", "IDS" FROM "TYPETEST2"
+               Oracle plan: SELECT STATEMENT
+               Oracle plan:   TABLE ACCESS FULL TYPETEST2
+(15 rows)
+
+EXPLAIN (VERBOSE on, COSTS off) SELECT t1.id, t2.id FROM typetest1 t1, typetest2 t2 WHERE t1.iym = t2.iym;
+                                              QUERY PLAN                                              
+------------------------------------------------------------------------------------------------------
+ Hash Join
+   Output: t1.id, t2.id
+   Hash Cond: (t1.iym = t2.iym)
+   ->  Foreign Scan on public.typetest1 t1
+         Output: t1.id, t1.iym
+         Oracle query: SELECT /*6961fbc40ed9d9d6e00585a9879f2b56*/ "ID", "IYM" FROM "TYPETEST1"
+         Oracle plan: SELECT STATEMENT
+         Oracle plan:   TABLE ACCESS FULL TYPETEST1
+   ->  Hash
+         Output: t2.id, t2.iym
+         ->  Foreign Scan on public.typetest2 t2
+               Output: t2.id, t2.iym
+               Oracle query: SELECT /*0f8c5416125adb270da7496d23013748*/ "ID", "IYM" FROM "TYPETEST2"
+               Oracle plan: SELECT STATEMENT
+               Oracle plan:   TABLE ACCESS FULL TYPETEST2
+(15 rows)
+
+SELECT t1.id, t2.id FROM typetest1 t1, typetest2 t2 WHERE t1.lc = t2.lc;
+ERROR:  error executing query: OCIStmtExecute failed to execute remote query
+DETAIL:  ORA-00932: inconsistent datatypes: expected - got CLOB
+SELECT t1.id, t2.id FROM typetest1 t1, typetest2 t2 WHERE t1.r = t2.r;
+ id | id 
+----+----
+  3 |  4
+  3 |  3
+  4 |  4
+  4 |  3
+  1 |  1
+(5 rows)
+
+SELECT t1.id, t2.id FROM typetest1 t1, typetest2 t2 WHERE t1.u = t2.u;
+ id | id 
+----+----
+  3 |  3
+  4 |  4
+  1 |  1
+(3 rows)
+
+SELECT t1.id, t2.id FROM typetest1 t1, typetest2 t2 WHERE t1.lb = t2.lb;
+ id | id 
+----+----
+  3 |  3
+  4 |  4
+  1 |  1
+(3 rows)
+
+SELECT t1.id, t2.id FROM typetest1 t1, typetest2 t2 WHERE t1.lr = t2.lr;
+ id | id 
+----+----
+  3 |  3
+  4 |  4
+  1 |  1
+(3 rows)
+
+SELECT t1.id, t2.id FROM typetest1 t1, typetest2 t2 WHERE t1.b = t2.b;
+ id | id 
+----+----
+  3 |  3
+  1 |  1
+(2 rows)
+
 SELECT t1.id, t2.id FROM typetest1 t1, typetest2 t2 WHERE t1.ids = t2.ids;
-ERROR:  error executing query: OCIStmtExecute failed to execute remote query
-DETAIL:  ORA-00920: invalid relational operator
+ id | id 
+----+----
+  3 |  3
+  4 |  4
+  1 |  1
+(3 rows)
+
 SELECT t1.id, t2.id FROM typetest1 t1, typetest2 t2 WHERE t1.iym = t2.iym;
-ERROR:  error executing query: OCIStmtExecute failed to execute remote query
-DETAIL:  ORA-00920: invalid relational operator
+ id | id 
+----+----
+  3 |  3
+  4 |  4
+  1 |  1
+(3 rows)
+
+/* Outer join */
+EXPLAIN (VERBOSE on, COSTS off) SELECT t1.id, t2.id FROM typetest1 t1 LEFT OUTER JOIN typetest2 t2 ON t1.id = t2.id;
+                                          QUERY PLAN                                           
+-----------------------------------------------------------------------------------------------
+ Hash Left Join
+   Output: t1.id, t2.id
+   Hash Cond: (t1.id = t2.id)
+   ->  Foreign Scan on public.typetest1 t1
+         Output: t1.id
+         Oracle query: SELECT /*4f6350747fa38115a65013100b4d7d2b*/ "ID" FROM "TYPETEST1"
+         Oracle plan: SELECT STATEMENT
+         Oracle plan:   TABLE ACCESS FULL TYPETEST1
+   ->  Hash
+         Output: t2.id
+         ->  Foreign Scan on public.typetest2 t2
+               Output: t2.id
+               Oracle query: SELECT /*b8beb6c796cf3fc6858a0fe60191055a*/ "ID" FROM "TYPETEST2"
+               Oracle plan: SELECT STATEMENT
+               Oracle plan:   TABLE ACCESS FULL TYPETEST2
+(15 rows)
+
+EXPLAIN (VERBOSE on, COSTS off) SELECT t1.id, t2.id FROM typetest1 t1 RIGHT OUTER JOIN typetest2 t2 ON t1.id = t2.id;
+                                                                 QUERY PLAN                                                                  
+---------------------------------------------------------------------------------------------------------------------------------------------
+ Hash Left Join
+   Output: t1.id, t2.id
+   Hash Cond: (t2.id = t1.id)
+   ->  Foreign Scan on public.typetest2 t2
+         Output: t2.id, t2.c, t2.nc, t2.vc, t2.nvc, t2.lc, t2.r, t2.u, t2.lb, t2.lr, t2.b, t2.num, t2.fl, t2.db, t2.d, t2.ts, t2.ids, t2.iym
+         Oracle query: SELECT /*b8beb6c796cf3fc6858a0fe60191055a*/ "ID" FROM "TYPETEST2"
+         Oracle plan: SELECT STATEMENT
+         Oracle plan:   TABLE ACCESS FULL TYPETEST2
+   ->  Hash
+         Output: t1.id
+         ->  Foreign Scan on public.typetest1 t1
+               Output: t1.id
+               Oracle query: SELECT /*4f6350747fa38115a65013100b4d7d2b*/ "ID" FROM "TYPETEST1"
+               Oracle plan: SELECT STATEMENT
+               Oracle plan:   TABLE ACCESS FULL TYPETEST1
+(15 rows)
+
+SELECT t1.id, t2.id FROM typetest1 t1 LEFT OUTER JOIN typetest2 t2 ON t1.id = t2.id;
+ id | id 
+----+----
+  3 |  3
+  4 |  4
+  1 |  1
+(3 rows)
+
+SELECT t1.id, t2.id FROM typetest1 t1 RIGHT OUTER JOIN typetest2 t2 ON t1.id = t2.id;
+ id | id 
+----+----
+  3 |  3
+  4 |  4
+  1 |  1
+    |  2
+(4 rows)
+
+/* Full join */
+EXPLAIN (VERBOSE on, COSTS off) SELECT t1.id, t2.id FROM typetest1 t1 FULL OUTER JOIN typetest2 t2 ON t1.id = t2.id;
+                                          QUERY PLAN                                           
+-----------------------------------------------------------------------------------------------
+ Hash Full Join
+   Output: t1.id, t2.id
+   Hash Cond: (t1.id = t2.id)
+   ->  Foreign Scan on public.typetest1 t1
+         Output: t1.id
+         Oracle query: SELECT /*4f6350747fa38115a65013100b4d7d2b*/ "ID" FROM "TYPETEST1"
+         Oracle plan: SELECT STATEMENT
+         Oracle plan:   TABLE ACCESS FULL TYPETEST1
+   ->  Hash
+         Output: t2.id
+         ->  Foreign Scan on public.typetest2 t2
+               Output: t2.id
+               Oracle query: SELECT /*b8beb6c796cf3fc6858a0fe60191055a*/ "ID" FROM "TYPETEST2"
+               Oracle plan: SELECT STATEMENT
+               Oracle plan:   TABLE ACCESS FULL TYPETEST2
+(15 rows)
+
+SELECT t1.id, t2.id FROM typetest1 t1 FULL OUTER JOIN typetest2 t2 ON t1.id = t2.id;
+ id | id 
+----+----
+  3 |  3
+  4 |  4
+  1 |  1
+    |  2
+(4 rows)
+
+/* Semi join */
+EXPLAIN (VERBOSE on, COSTS off) SELECT t1.id FROM typetest1 t1 WHERE EXISTS (SELECT t2.id FROM typetest2 t2 WHERE t1.id > 1);
+                                                QUERY PLAN                                                
+----------------------------------------------------------------------------------------------------------
+ Nested Loop Semi Join
+   Output: t1.id
+   ->  Foreign Scan on public.typetest1 t1
+         Output: t1.id
+         Oracle query: SELECT /*2c4b642f7dc641f26366d4cb7109a926*/ "ID" FROM "TYPETEST1" WHERE ("ID" > 1)
+         Oracle plan: SELECT STATEMENT
+         Oracle plan:   INDEX RANGE SCAN TYPETEST1_PKEY (condition "ID">1)
+   ->  Materialize
+         ->  Foreign Scan on public.typetest2 t2
+               Oracle query: SELECT /*de0b3cf96e2006853976e92efdfe9f1b*/ '1' FROM "TYPETEST2"
+               Oracle plan: SELECT STATEMENT
+               Oracle plan:   TABLE ACCESS FULL TYPETEST2
+(12 rows)
+
+SELECT t1.id FROM typetest1 t1 WHERE EXISTS (SELECT t2.id FROM typetest2 t2 WHERE t1.id > 1);
+ id 
+----
+  3
+  4
+(2 rows)
+
+/* Anti join */
+EXPLAIN (VERBOSE on, COSTS off) SELECT t1.id FROM typetest1 t1 WHERE NOT EXISTS (SELECT t2.id FROM typetest2 t2 WHERE t1.id = t2.id);
+                                          QUERY PLAN                                           
+-----------------------------------------------------------------------------------------------
+ Hash Anti Join
+   Output: t1.id
+   Hash Cond: (t1.id = t2.id)
+   ->  Foreign Scan on public.typetest1 t1
+         Output: t1.id
+         Oracle query: SELECT /*4f6350747fa38115a65013100b4d7d2b*/ "ID" FROM "TYPETEST1"
+         Oracle plan: SELECT STATEMENT
+         Oracle plan:   TABLE ACCESS FULL TYPETEST1
+   ->  Hash
+         Output: t2.id
+         ->  Foreign Scan on public.typetest2 t2
+               Output: t2.id
+               Oracle query: SELECT /*b8beb6c796cf3fc6858a0fe60191055a*/ "ID" FROM "TYPETEST2"
+               Oracle plan: SELECT STATEMENT
+               Oracle plan:   TABLE ACCESS FULL TYPETEST2
+(15 rows)
+
+SELECT t1.id FROM typetest1 t1 WHERE NOT EXISTS (SELECT t2.id FROM typetest2 t2 WHERE t1.id = t2.id);
+ id 
+----
+(0 rows)
+
+/* 3-way join */
+CREATE FOREIGN TABLE typetest3 (
+   id  integer OPTIONS (key 'yes') NOT NULL,
+   c   character(10),
+   nc  character(10),
+   vc  character varying(10),
+   nvc character varying(10),
+   lc  text,
+   r   bytea,
+   u   uuid,
+   lb  bytea,
+   lr  bytea,
+   b   boolean,
+   num numeric(7,5),
+   fl  float,
+   db  double precision,
+   d   date,
+   ts  timestamp with time zone,
+   ids interval,
+   iym interval
+) SERVER oracle OPTIONS (table 'TYPETEST3');
+INSERT INTO typetest3 SELECT * FROM typetest1;
+INSERT INTO typetest3 (id, c) VALUES (2, NULL);
+EXPLAIN (VERBOSE on, COSTS off) SELECT t1.id, t2.id, t3.id FROM typetest1 t1, typetest2 t2, typetest3 t3 WHERE t1.id = t2.id AND t2.id = t3.id;
+                                                                             QUERY PLAN                                                                              
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Hash Join
+   Output: t1.id, t2.id, t3.id
+   Hash Cond: (t3.id = t1.id)
+   ->  Foreign Scan on public.typetest3 t3
+         Output: t3.id, t3.c, t3.nc, t3.vc, t3.nvc, t3.lc, t3.r, t3.u, t3.lb, t3.lr, t3.b, t3.num, t3.fl, t3.db, t3.d, t3.ts, t3.ids, t3.iym
+         Oracle query: SELECT /*3de7e501acf650e4be3735c1258c2620*/ "ID" FROM "TYPETEST3"
+         Oracle plan: SELECT STATEMENT
+         Oracle plan:   TABLE ACCESS FULL TYPETEST3
+   ->  Hash
+         Output: t1.id, t2.id
+         ->  Foreign Scan
+               Output: t1.id, t2.id
+               Oracle query: SELECT /*57b3f07123bbcd736ad43dc7465b22eb*/ r1."ID", r2."ID" FROM ("TYPETEST1" r1 INNER JOIN "TYPETEST2" r2 ON (((r1."ID" = r2."ID"))))
+               Oracle plan: SELECT STATEMENT
+               Oracle plan:   NESTED LOOPS
+               Oracle plan:     TABLE ACCESS FULL TYPETEST1
+               Oracle plan:     INDEX UNIQUE SCAN TYPETEST2_PKEY (condition "R1"."ID"="R2"."ID")
+(17 rows)
+
+SELECT t1.id, t2.id, t3.id FROM typetest1 t1, typetest2 t2, typetest3 t3 WHERE t1.id = t2.id AND t2.id = t3.id;
+ id | id | id 
+----+----+----
+  3 |  3 |  3
+  4 |  4 |  4
+  1 |  1 |  1
+(3 rows)
+
+/* Clean up */
 DELETE FROM typetest2;
+DELETE FROM typetest3;
