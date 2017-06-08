@@ -408,141 +408,141 @@ EXPLAIN (VERBOSE on, COSTS off) SELECT t1.id, t2.id FROM typetest1 t1, typetest2
 ERROR:  error describing query: OCIStmtExecute failed to describe remote query
 DETAIL:  ORA-00932: inconsistent datatypes: expected - got CLOB
 EXPLAIN (VERBOSE on, COSTS off) SELECT t1.id, t2.id FROM typetest1 t1, typetest2 t2 WHERE t1.r = t2.r;
-                                             QUERY PLAN                                             
-----------------------------------------------------------------------------------------------------
+                                                 QUERY PLAN                                                  
+-------------------------------------------------------------------------------------------------------------
  Hash Join
    Output: t1.id, t2.id
    Hash Cond: (t1.r = t2.r)
    ->  Foreign Scan on public.typetest1 t1
          Output: t1.id, t1.r
-         Oracle query: SELECT /*0c9fa21440d92d95e83dcb1672e0737c*/ "ID", "R" FROM "TYPETEST1"
+         Oracle query: SELECT /*9f1e294420559946936f606f1ff19bb7*/ r1."ID", r1."R" FROM "TYPETEST1" r1
          Oracle plan: SELECT STATEMENT
          Oracle plan:   TABLE ACCESS FULL TYPETEST1
    ->  Hash
          Output: t2.id, t2.r
          ->  Foreign Scan on public.typetest2 t2
                Output: t2.id, t2.r
-               Oracle query: SELECT /*a5233cf2478338eaf2a9f54608a3425f*/ "ID", "R" FROM "TYPETEST2"
+               Oracle query: SELECT /*363f54e5ae4e9091fd3a2f8051aa63f8*/ r2."ID", r2."R" FROM "TYPETEST2" r2
                Oracle plan: SELECT STATEMENT
                Oracle plan:   TABLE ACCESS FULL TYPETEST2
 (15 rows)
 
 EXPLAIN (VERBOSE on, COSTS off) SELECT t1.id, t2.id FROM typetest1 t1, typetest2 t2 WHERE t1.u = t2.u;
-                                             QUERY PLAN                                             
-----------------------------------------------------------------------------------------------------
+                                                 QUERY PLAN                                                  
+-------------------------------------------------------------------------------------------------------------
  Hash Join
    Output: t1.id, t2.id
    Hash Cond: (t1.u = t2.u)
    ->  Foreign Scan on public.typetest1 t1
          Output: t1.id, t1.u
-         Oracle query: SELECT /*ffae5bd6ad5bf1cf7817c59bfeb96ee3*/ "ID", "U" FROM "TYPETEST1"
+         Oracle query: SELECT /*831ed8c206ec4383c136319d08fff86a*/ r1."ID", r1."U" FROM "TYPETEST1" r1
          Oracle plan: SELECT STATEMENT
          Oracle plan:   TABLE ACCESS FULL TYPETEST1
    ->  Hash
          Output: t2.id, t2.u
          ->  Foreign Scan on public.typetest2 t2
                Output: t2.id, t2.u
-               Oracle query: SELECT /*9c5898262b3891b1e1d79bceb514f860*/ "ID", "U" FROM "TYPETEST2"
+               Oracle query: SELECT /*fc1d52517d00d7cd22a0eb2fd015dd1b*/ r2."ID", r2."U" FROM "TYPETEST2" r2
                Oracle plan: SELECT STATEMENT
                Oracle plan:   TABLE ACCESS FULL TYPETEST2
 (15 rows)
 
 EXPLAIN (VERBOSE on, COSTS off) SELECT t1.id, t2.id FROM typetest1 t1, typetest2 t2 WHERE t1.lb = t2.lb;
-                                             QUERY PLAN                                              
------------------------------------------------------------------------------------------------------
+                                                  QUERY PLAN                                                  
+--------------------------------------------------------------------------------------------------------------
  Hash Join
    Output: t1.id, t2.id
    Hash Cond: (t1.lb = t2.lb)
    ->  Foreign Scan on public.typetest1 t1
          Output: t1.id, t1.lb
-         Oracle query: SELECT /*6dc461b76247fbb553df564450096618*/ "ID", "LB" FROM "TYPETEST1"
+         Oracle query: SELECT /*b75147ff3902d2a649fbda14563a4684*/ r1."ID", r1."LB" FROM "TYPETEST1" r1
          Oracle plan: SELECT STATEMENT
          Oracle plan:   TABLE ACCESS FULL TYPETEST1
    ->  Hash
          Output: t2.id, t2.lb
          ->  Foreign Scan on public.typetest2 t2
                Output: t2.id, t2.lb
-               Oracle query: SELECT /*62b3a5e0f6ff5cd029564e75c75446b7*/ "ID", "LB" FROM "TYPETEST2"
+               Oracle query: SELECT /*e44c813a3fa234b19dd9f8543e99c52a*/ r2."ID", r2."LB" FROM "TYPETEST2" r2
                Oracle plan: SELECT STATEMENT
                Oracle plan:   TABLE ACCESS FULL TYPETEST2
 (15 rows)
 
 EXPLAIN (VERBOSE on, COSTS off) SELECT t1.id, t2.id FROM typetest1 t1, typetest2 t2 WHERE t1.lr = t2.lr;
-                                             QUERY PLAN                                              
------------------------------------------------------------------------------------------------------
+                                                  QUERY PLAN                                                  
+--------------------------------------------------------------------------------------------------------------
  Hash Join
    Output: t1.id, t2.id
    Hash Cond: (t1.lr = t2.lr)
    ->  Foreign Scan on public.typetest1 t1
          Output: t1.id, t1.lr
-         Oracle query: SELECT /*faecebda86509ce0a9a1ef78d2194162*/ "ID", "LR" FROM "TYPETEST1"
+         Oracle query: SELECT /*902a1a3bbfc2b463eb023d59ab2be33e*/ r1."ID", r1."LR" FROM "TYPETEST1" r1
          Oracle plan: SELECT STATEMENT
          Oracle plan:   TABLE ACCESS FULL TYPETEST1
    ->  Hash
          Output: t2.id, t2.lr
          ->  Foreign Scan on public.typetest2 t2
                Output: t2.id, t2.lr
-               Oracle query: SELECT /*a89877f481a22ffd4525f4b0624d57f1*/ "ID", "LR" FROM "TYPETEST2"
+               Oracle query: SELECT /*0b646dab2a0ad6341fcabf9ac37a1cf6*/ r2."ID", r2."LR" FROM "TYPETEST2" r2
                Oracle plan: SELECT STATEMENT
                Oracle plan:   TABLE ACCESS FULL TYPETEST2
 (15 rows)
 
 EXPLAIN (VERBOSE on, COSTS off) SELECT t1.id, t2.id FROM typetest1 t1, typetest2 t2 WHERE t1.b = t2.b;
-                                             QUERY PLAN                                             
-----------------------------------------------------------------------------------------------------
+                                                 QUERY PLAN                                                  
+-------------------------------------------------------------------------------------------------------------
  Hash Join
    Output: t1.id, t2.id
    Hash Cond: (t1.b = t2.b)
    ->  Foreign Scan on public.typetest1 t1
          Output: t1.id, t1.b
-         Oracle query: SELECT /*6abe344527b0c16deb1a2a81a45c8659*/ "ID", "B" FROM "TYPETEST1"
+         Oracle query: SELECT /*856959f6eb83c77f47ff3834ea11e35f*/ r1."ID", r1."B" FROM "TYPETEST1" r1
          Oracle plan: SELECT STATEMENT
          Oracle plan:   TABLE ACCESS FULL TYPETEST1
    ->  Hash
          Output: t2.id, t2.b
          ->  Foreign Scan on public.typetest2 t2
                Output: t2.id, t2.b
-               Oracle query: SELECT /*24422dc7b463712d9458e19b90ac7144*/ "ID", "B" FROM "TYPETEST2"
+               Oracle query: SELECT /*1633cfed0e4d98c694fb83ffd4e2bedb*/ r2."ID", r2."B" FROM "TYPETEST2" r2
                Oracle plan: SELECT STATEMENT
                Oracle plan:   TABLE ACCESS FULL TYPETEST2
 (15 rows)
 
 EXPLAIN (VERBOSE on, COSTS off) SELECT t1.id, t2.id FROM typetest1 t1, typetest2 t2 WHERE t1.ids = t2.ids;
-                                              QUERY PLAN                                              
-------------------------------------------------------------------------------------------------------
+                                                  QUERY PLAN                                                   
+---------------------------------------------------------------------------------------------------------------
  Hash Join
    Output: t1.id, t2.id
    Hash Cond: (t1.ids = t2.ids)
    ->  Foreign Scan on public.typetest1 t1
          Output: t1.id, t1.ids
-         Oracle query: SELECT /*647f56c7d583b7a086f914b26c50982b*/ "ID", "IDS" FROM "TYPETEST1"
+         Oracle query: SELECT /*8549a4c6ce560bcc16c50cdbf4552584*/ r1."ID", r1."IDS" FROM "TYPETEST1" r1
          Oracle plan: SELECT STATEMENT
          Oracle plan:   TABLE ACCESS FULL TYPETEST1
    ->  Hash
          Output: t2.id, t2.ids
          ->  Foreign Scan on public.typetest2 t2
                Output: t2.id, t2.ids
-               Oracle query: SELECT /*6a2ef5f1a4e55fcb6503399ca64fb9bd*/ "ID", "IDS" FROM "TYPETEST2"
+               Oracle query: SELECT /*a1af8e6b331678d3576791b0ea99ec41*/ r2."ID", r2."IDS" FROM "TYPETEST2" r2
                Oracle plan: SELECT STATEMENT
                Oracle plan:   TABLE ACCESS FULL TYPETEST2
 (15 rows)
 
 EXPLAIN (VERBOSE on, COSTS off) SELECT t1.id, t2.id FROM typetest1 t1, typetest2 t2 WHERE t1.iym = t2.iym;
-                                              QUERY PLAN                                              
-------------------------------------------------------------------------------------------------------
+                                                  QUERY PLAN                                                   
+---------------------------------------------------------------------------------------------------------------
  Hash Join
    Output: t1.id, t2.id
    Hash Cond: (t1.iym = t2.iym)
    ->  Foreign Scan on public.typetest1 t1
          Output: t1.id, t1.iym
-         Oracle query: SELECT /*6961fbc40ed9d9d6e00585a9879f2b56*/ "ID", "IYM" FROM "TYPETEST1"
+         Oracle query: SELECT /*b46d4f6e70008d3ca1ee57ac79a1a17e*/ r1."ID", r1."IYM" FROM "TYPETEST1" r1
          Oracle plan: SELECT STATEMENT
          Oracle plan:   TABLE ACCESS FULL TYPETEST1
    ->  Hash
          Output: t2.id, t2.iym
          ->  Foreign Scan on public.typetest2 t2
                Output: t2.id, t2.iym
-               Oracle query: SELECT /*0f8c5416125adb270da7496d23013748*/ "ID", "IYM" FROM "TYPETEST2"
+               Oracle query: SELECT /*9a10317b798936ca383fb61b86768d8c*/ r2."ID", r2."IYM" FROM "TYPETEST2" r2
                Oracle plan: SELECT STATEMENT
                Oracle plan:   TABLE ACCESS FULL TYPETEST2
 (15 rows)
@@ -609,21 +609,21 @@ SELECT t1.id, t2.id FROM typetest1 t1, typetest2 t2 WHERE t1.iym = t2.iym;
 
 /* Outer join */
 EXPLAIN (VERBOSE on, COSTS off) SELECT t1.id, t2.id FROM typetest1 t1 LEFT OUTER JOIN typetest2 t2 ON t1.id = t2.id;
-                                          QUERY PLAN                                           
------------------------------------------------------------------------------------------------
+                                             QUERY PLAN                                              
+-----------------------------------------------------------------------------------------------------
  Hash Left Join
    Output: t1.id, t2.id
    Hash Cond: (t1.id = t2.id)
    ->  Foreign Scan on public.typetest1 t1
          Output: t1.id
-         Oracle query: SELECT /*4f6350747fa38115a65013100b4d7d2b*/ "ID" FROM "TYPETEST1"
+         Oracle query: SELECT /*709894645e7b46ee7c82f53e6eeb7cac*/ r1."ID" FROM "TYPETEST1" r1
          Oracle plan: SELECT STATEMENT
          Oracle plan:   TABLE ACCESS FULL TYPETEST1
    ->  Hash
          Output: t2.id
          ->  Foreign Scan on public.typetest2 t2
                Output: t2.id
-               Oracle query: SELECT /*b8beb6c796cf3fc6858a0fe60191055a*/ "ID" FROM "TYPETEST2"
+               Oracle query: SELECT /*327022dc461ec688545fd1303850f6e4*/ r2."ID" FROM "TYPETEST2" r2
                Oracle plan: SELECT STATEMENT
                Oracle plan:   TABLE ACCESS FULL TYPETEST2
 (15 rows)
@@ -636,14 +636,14 @@ EXPLAIN (VERBOSE on, COSTS off) SELECT t1.id, t2.id FROM typetest1 t1 RIGHT OUTE
    Hash Cond: (t2.id = t1.id)
    ->  Foreign Scan on public.typetest2 t2
          Output: t2.id, t2.c, t2.nc, t2.vc, t2.nvc, t2.lc, t2.r, t2.u, t2.lb, t2.lr, t2.b, t2.num, t2.fl, t2.db, t2.d, t2.ts, t2.ids, t2.iym
-         Oracle query: SELECT /*b8beb6c796cf3fc6858a0fe60191055a*/ "ID" FROM "TYPETEST2"
+         Oracle query: SELECT /*327022dc461ec688545fd1303850f6e4*/ r2."ID" FROM "TYPETEST2" r2
          Oracle plan: SELECT STATEMENT
          Oracle plan:   TABLE ACCESS FULL TYPETEST2
    ->  Hash
          Output: t1.id
          ->  Foreign Scan on public.typetest1 t1
                Output: t1.id
-               Oracle query: SELECT /*4f6350747fa38115a65013100b4d7d2b*/ "ID" FROM "TYPETEST1"
+               Oracle query: SELECT /*709894645e7b46ee7c82f53e6eeb7cac*/ r1."ID" FROM "TYPETEST1" r1
                Oracle plan: SELECT STATEMENT
                Oracle plan:   TABLE ACCESS FULL TYPETEST1
 (15 rows)
@@ -667,21 +667,21 @@ SELECT t1.id, t2.id FROM typetest1 t1 RIGHT OUTER JOIN typetest2 t2 ON t1.id = t
 
 /* Full join */
 EXPLAIN (VERBOSE on, COSTS off) SELECT t1.id, t2.id FROM typetest1 t1 FULL OUTER JOIN typetest2 t2 ON t1.id = t2.id;
-                                          QUERY PLAN                                           
------------------------------------------------------------------------------------------------
+                                             QUERY PLAN                                              
+-----------------------------------------------------------------------------------------------------
  Hash Full Join
    Output: t1.id, t2.id
    Hash Cond: (t1.id = t2.id)
    ->  Foreign Scan on public.typetest1 t1
          Output: t1.id
-         Oracle query: SELECT /*4f6350747fa38115a65013100b4d7d2b*/ "ID" FROM "TYPETEST1"
+         Oracle query: SELECT /*709894645e7b46ee7c82f53e6eeb7cac*/ r1."ID" FROM "TYPETEST1" r1
          Oracle plan: SELECT STATEMENT
          Oracle plan:   TABLE ACCESS FULL TYPETEST1
    ->  Hash
          Output: t2.id
          ->  Foreign Scan on public.typetest2 t2
                Output: t2.id
-               Oracle query: SELECT /*b8beb6c796cf3fc6858a0fe60191055a*/ "ID" FROM "TYPETEST2"
+               Oracle query: SELECT /*327022dc461ec688545fd1303850f6e4*/ r2."ID" FROM "TYPETEST2" r2
                Oracle plan: SELECT STATEMENT
                Oracle plan:   TABLE ACCESS FULL TYPETEST2
 (15 rows)
@@ -697,18 +697,18 @@ SELECT t1.id, t2.id FROM typetest1 t1 FULL OUTER JOIN typetest2 t2 ON t1.id = t2
 
 /* Semi join */
 EXPLAIN (VERBOSE on, COSTS off) SELECT t1.id FROM typetest1 t1 WHERE EXISTS (SELECT t2.id FROM typetest2 t2 WHERE t1.id > 1);
-                                                QUERY PLAN                                                
-----------------------------------------------------------------------------------------------------------
+                                                    QUERY PLAN                                                     
+-------------------------------------------------------------------------------------------------------------------
  Nested Loop Semi Join
    Output: t1.id
    ->  Foreign Scan on public.typetest1 t1
          Output: t1.id
-         Oracle query: SELECT /*2c4b642f7dc641f26366d4cb7109a926*/ "ID" FROM "TYPETEST1" WHERE ("ID" > 1)
+         Oracle query: SELECT /*5bdfdb200b5d554d5d62fd202e0570e0*/ r1."ID" FROM "TYPETEST1" r1 WHERE (r1."ID" > 1)
          Oracle plan: SELECT STATEMENT
-         Oracle plan:   INDEX RANGE SCAN TYPETEST1_PKEY (condition "ID">1)
+         Oracle plan:   INDEX RANGE SCAN TYPETEST1_PKEY (condition "R1"."ID">1)
    ->  Materialize
          ->  Foreign Scan on public.typetest2 t2
-               Oracle query: SELECT /*de0b3cf96e2006853976e92efdfe9f1b*/ '1' FROM "TYPETEST2"
+               Oracle query: SELECT /*d36ee93b8645edaf84a57fc6290d0a23*/ '1' FROM "TYPETEST2" r2
                Oracle plan: SELECT STATEMENT
                Oracle plan:   TABLE ACCESS FULL TYPETEST2
 (12 rows)
@@ -722,21 +722,21 @@ SELECT t1.id FROM typetest1 t1 WHERE EXISTS (SELECT t2.id FROM typetest2 t2 WHER
 
 /* Anti join */
 EXPLAIN (VERBOSE on, COSTS off) SELECT t1.id FROM typetest1 t1 WHERE NOT EXISTS (SELECT t2.id FROM typetest2 t2 WHERE t1.id = t2.id);
-                                          QUERY PLAN                                           
------------------------------------------------------------------------------------------------
+                                             QUERY PLAN                                              
+-----------------------------------------------------------------------------------------------------
  Hash Anti Join
    Output: t1.id
    Hash Cond: (t1.id = t2.id)
    ->  Foreign Scan on public.typetest1 t1
          Output: t1.id
-         Oracle query: SELECT /*4f6350747fa38115a65013100b4d7d2b*/ "ID" FROM "TYPETEST1"
+         Oracle query: SELECT /*709894645e7b46ee7c82f53e6eeb7cac*/ r1."ID" FROM "TYPETEST1" r1
          Oracle plan: SELECT STATEMENT
          Oracle plan:   TABLE ACCESS FULL TYPETEST1
    ->  Hash
          Output: t2.id
          ->  Foreign Scan on public.typetest2 t2
                Output: t2.id
-               Oracle query: SELECT /*b8beb6c796cf3fc6858a0fe60191055a*/ "ID" FROM "TYPETEST2"
+               Oracle query: SELECT /*327022dc461ec688545fd1303850f6e4*/ r2."ID" FROM "TYPETEST2" r2
                Oracle plan: SELECT STATEMENT
                Oracle plan:   TABLE ACCESS FULL TYPETEST2
 (15 rows)
@@ -777,7 +777,7 @@ EXPLAIN (VERBOSE on, COSTS off) SELECT t1.id, t2.id, t3.id FROM typetest1 t1, ty
    Hash Cond: (t3.id = t1.id)
    ->  Foreign Scan on public.typetest3 t3
          Output: t3.id, t3.c, t3.nc, t3.vc, t3.nvc, t3.lc, t3.r, t3.u, t3.lb, t3.lr, t3.b, t3.num, t3.fl, t3.db, t3.d, t3.ts, t3.ids, t3.iym
-         Oracle query: SELECT /*3de7e501acf650e4be3735c1258c2620*/ "ID" FROM "TYPETEST3"
+         Oracle query: SELECT /*4a7022ac27b2cccf2101bb817fde0a09*/ r3."ID" FROM "TYPETEST3" r3
          Oracle plan: SELECT STATEMENT
          Oracle plan:   TABLE ACCESS FULL TYPETEST3
    ->  Hash

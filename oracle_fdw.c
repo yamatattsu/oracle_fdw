@@ -298,14 +298,14 @@ static List *oracleImportForeignSchema(ImportForeignSchemaStmt *stmt, Oid server
 static struct OracleFdwState *getFdwState(Oid foreigntableid, double *sample_percent);
 static void oracleGetOptions(Oid foreigntableid, List **options);
 static char *createQuery(struct OracleFdwState *fdwState, RelOptInfo *foreignrel, bool modify, List *query_pathkeys);
-static void deparseFromExprForRel(StringInfo buf, RelOptInfo *joinrel, bool use_alias, List **params_list);
+static void deparseFromExprForRel(StringInfo buf, RelOptInfo *joinrel, List **params_list);
 static void appendConditions(List *exprs, StringInfo buf, RelOptInfo *joinrel, List **params_list);
 static void getColumnData(Oid foreigntableid, struct oraTable *oraTable);
 #ifndef OLD_FDW_API
 static int acquireSampleRowsFunc (Relation relation, int elevel, HeapTuple *rows, int targrows, double *totalrows, double *totaldeadrows);
 static void appendAsType(StringInfoData *dest, const char *s, Oid type);
 #endif  /* OLD_FDW_API */
-static char *deparseExpr(oracleSession *session, RelOptInfo *foreignrel, Expr *expr, const struct oraTable *oraTable, List **params, bool use_alias);
+static char *deparseExpr(oracleSession *session, RelOptInfo *foreignrel, Expr *expr, const struct oraTable *oraTable, List **params);
 static char *datumToString(Datum datum, Oid type);
 static void getUsedColumns(Expr *expr, struct oraTable *oraTable);
 static void checkDataType(oraType oratype, int scale, Oid pgtype, const char *tablename, const char *colname);
@@ -815,7 +815,7 @@ oracleGetForeignRelSize(PlannerInfo *root, RelOptInfo *baserel, Oid foreigntable
 	foreach(cell, conditions)
 	{
 		/* classify conditions to local_conds or remote_conds */
-		where = deparseExpr(fdwState->session, baserel, ((RestrictInfo *)lfirst(cell))->clause, fdwState->oraTable, &(fdwState->params), false);
+		where = deparseExpr(fdwState->session, baserel, ((RestrictInfo *)lfirst(cell))->clause, fdwState->oraTable, &(fdwState->params));
 		if (where != NULL) {
 			elog(DEBUG1, "remote_conds: %s", where);
 			remote_conds = lappend(remote_conds, ((RestrictInfo *)lfirst(cell))->clause);
@@ -920,7 +920,7 @@ oracleGetForeignPaths(PlannerInfo *root, RelOptInfo *baserel, Oid foreigntableid
 		}
 
 		if (can_pushdown &&
-			((sort_clause = deparseExpr(fdwState->session, baserel, em_expr, fdwState->oraTable, &(fdwState->params), false)) != NULL)){
+			((sort_clause = deparseExpr(fdwState->session, baserel, em_expr, fdwState->oraTable, &(fdwState->params))) != NULL)){
 			/* keep usable_pathkeys for later use. */
 			usable_pathkeys = lappend(usable_pathkeys, pathkey);
 
@@ -2726,27 +2726,13 @@ char
 			if (first_col)
 			{
 				first_col = false;
-				if (foreignrel->reloptkind == RELOPT_JOINREL)
-				{
-					/* add alias of tablename to column name */
-					appendStringInfo(&query, "%s%s", alias.data, fdwState->oraTable->cols[i]->name);
-				}
-				else
-				{
-					appendStringInfo(&query, "%s", fdwState->oraTable->cols[i]->name);
-				}
+				/* add alias of tablename to column name */
+				appendStringInfo(&query, "%s%s", alias.data, fdwState->oraTable->cols[i]->name);
 			}
 			else
 			{
-				if (foreignrel->reloptkind == RELOPT_JOINREL)
-				{
-					/* add alias of tablename to column name */
-					appendStringInfo(&query, ", %s%s", alias.data, fdwState->oraTable->cols[i]->name);
-				}
-				else
-				{
-					appendStringInfo(&query, ", %s", fdwState->oraTable->cols[i]->name);
-				}
+				/* add alias of tablename to column name */
+				appendStringInfo(&query, ", %s%s", alias.data, fdwState->oraTable->cols[i]->name);
 			}
 		}
 	}
@@ -2760,19 +2746,20 @@ char
 	{
 		appendStringInfo(&query, " FROM ");
 		deparseFromExprForRel(&query, foreignrel,
-							  (foreignrel->reloptkind == RELOPT_JOINREL),
-							  &(fdwState->params));	
+								&(fdwState->params));	
 	}
 	else
 	{
-		appendStringInfo(&query, " FROM %s", fdwState->oraTable->name);
+		appendStringInfo(&query, " FROM ");
+		deparseFromExprForRel(&query, foreignrel,
+								&(fdwState->params));
 
 		/* append WHERE clauses */
 		first_col = true;
 		foreach(cell, conditions)
 		{
 			/* try to convert each condition to Oracle SQL */
-			where = deparseExpr(fdwState->session, foreignrel, ((RestrictInfo *)lfirst(cell))->clause, fdwState->oraTable, &(fdwState->params), false);
+			where = deparseExpr(fdwState->session, foreignrel, ((RestrictInfo *)lfirst(cell))->clause, fdwState->oraTable, &(fdwState->params));
 			if (where != NULL) {
 				/* append new WHERE clause to query string */
 				if (first_col)
@@ -2848,8 +2835,7 @@ char
  * relation it just returns tablename, with the appropriate alias if so requested.
  */
 static void
-deparseFromExprForRel(StringInfo buf, RelOptInfo *foreignrel,
-					  bool use_alias, List **params_list)
+deparseFromExprForRel(StringInfo buf, RelOptInfo *foreignrel, List **params_list)
 {
 	struct OracleFdwState *fdwState = (struct OracleFdwState *)foreignrel->fdw_private;
 
@@ -2862,12 +2848,12 @@ deparseFromExprForRel(StringInfo buf, RelOptInfo *foreignrel,
 
 		/* Deparse outer relation */
 		initStringInfo(&join_sql_o);
-		deparseFromExprForRel(&join_sql_o, rel_o, true, params_list);
+		deparseFromExprForRel(&join_sql_o, rel_o, params_list);
 		elog(DEBUG3, "join_sql_o: %s", join_sql_o.data);
 
 		/* Deparse inner relation */
 		initStringInfo(&join_sql_i);
-		deparseFromExprForRel(&join_sql_i, rel_i, true, params_list);
+		deparseFromExprForRel(&join_sql_i, rel_i, params_list);
 		elog(DEBUG3, "join_sql_i: %s", join_sql_i.data);
 
 		/*
@@ -2912,8 +2898,7 @@ deparseFromExprForRel(StringInfo buf, RelOptInfo *foreignrel,
 		 * pulled up subqueries in the query being built for a pushed down
 		 * join.
 		 */
-		if (use_alias)
-			appendStringInfo(buf, " %s%d", REL_ALIAS_PREFIX, foreignrel->relid);
+		appendStringInfo(buf, " %s%d", REL_ALIAS_PREFIX, foreignrel->relid);
 		elog(DEBUG1, "foreignrel->relid : %d", foreignrel->relid);
 		elog(DEBUG1, "buf->data: %s", buf->data);
 	}
@@ -2944,8 +2929,7 @@ appendConditions(List *exprs, StringInfo buf,
 
 		appendStringInfo(buf, "(");
 
-		/* set use_alias = true */
-		where = deparseExpr(NULL, joinrel, expr, NULL, params_list, true);
+		where = deparseExpr(NULL, joinrel, expr, NULL, params_list);
 
 		appendStringInfo(buf, "%s)", where);
 
@@ -3156,7 +3140,7 @@ appendAsType(StringInfoData *dest, const char *s, Oid type)
  * 		will be stored in "params".
  */
 char *
-deparseExpr(oracleSession *session, RelOptInfo *foreignrel, Expr *expr, const struct oraTable *oraTable, List **params, bool use_alias)
+deparseExpr(oracleSession *session, RelOptInfo *foreignrel, Expr *expr, const struct oraTable *oraTable, List **params)
 {
 	char *opername, *left, *right, *arg, oprkind;
 #ifndef OLD_FDW_API
@@ -3188,6 +3172,7 @@ deparseExpr(oracleSession *session, RelOptInfo *foreignrel, Expr *expr, const st
 	Datum datum;
 	bool first_arg, isNull;
 	int index;
+	StringInfoData alias;
 
 	if (expr == NULL)
 		return NULL;
@@ -3311,18 +3296,10 @@ elog(DEBUG1, "index: %d", index);
 elog(DEBUG1, "T_Var oraTable->cols[index]->name: %s", oraTable->cols[index]->name);
 
 				/* RELOPT_JOINREL needs alias such as r1, r2. */
-				if(!use_alias)
-				{
-					appendStringInfo(&result, "%s", oraTable->cols[index]->name);
-				}
-				else
-				{
-					StringInfoData alias;
-					initStringInfo(&alias);
-					ADD_REL_QUALIFIER(&alias, oraTable->cols[index]->varno); /* create aliase from varno */
+				initStringInfo(&alias);
+				ADD_REL_QUALIFIER(&alias, oraTable->cols[index]->varno); /* create aliase from varno */
 
-					appendStringInfo(&result, "%s%s", alias.data, oraTable->cols[index]->name);
-				}
+				appendStringInfo(&result, "%s%s", alias.data, oraTable->cols[index]->name);
 
 				/* work around the lack of booleans in Oracle */
 				if (variable->vartype == BOOLOID)
@@ -3431,13 +3408,13 @@ elog(DEBUG1, "T_OpExpr left");
 					Assert(oraTable == NULL);
 
 					elog(DEBUG1,"left is RELOPT_JOINREL");
-					left = deparseExpr(session, outerrel, linitial(oper->args), fdwState_o->oraTable, params, use_alias);
+					left = deparseExpr(session, outerrel, linitial(oper->args), fdwState_o->oraTable, params);
 					elog(DEBUG1,"left: %s", left);
 				}
 				else
 				{
 					elog(DEBUG1,"left is not RELOPT_JOINREL");
-					left = deparseExpr(session, foreignrel, linitial(oper->args), oraTable, params, use_alias);
+					left = deparseExpr(session, foreignrel, linitial(oper->args), oraTable, params);
 				}
 
 				if (left == NULL)
@@ -3456,12 +3433,12 @@ elog(DEBUG1, "T_OpExpr right");
 						RelOptInfo *innerrel = ((struct OracleFdwState *)foreignrel->fdw_private)->innerrel;
 						struct OracleFdwState *fdwState_i = (struct OracleFdwState *)innerrel->fdw_private;
 
-						right = deparseExpr(session, innerrel, lsecond(oper->args), fdwState_i->oraTable, params, use_alias);
+						right = deparseExpr(session, innerrel, lsecond(oper->args), fdwState_i->oraTable, params);
 						elog(DEBUG1,"right: %s", right);
 					}
 					else
 					{
-						right = deparseExpr(session, foreignrel, lsecond(oper->args), oraTable, params, use_alias);
+						right = deparseExpr(session, foreignrel, lsecond(oper->args), oraTable, params);
 					}
 
 					if (right == NULL)
@@ -3572,7 +3549,7 @@ elog(DEBUG1, "T_OpExpr right");
 			if (! canHandleType(leftargtype))
 				return NULL;
 
-			left = deparseExpr(session, foreignrel, linitial(arrayoper->args), oraTable, params, use_alias);
+			left = deparseExpr(session, foreignrel, linitial(arrayoper->args), oraTable, params);
 			if (left == NULL)
 				return NULL;
 
@@ -3647,7 +3624,7 @@ elog(DEBUG1, "T_OpExpr right");
 					foreach(cell, array->elements)
 					{
 						/* convert the argument to a string */
-						char *element = deparseExpr(session, foreignrel, (Expr *)lfirst(cell), oraTable, params, use_alias);
+						char *element = deparseExpr(session, foreignrel, (Expr *)lfirst(cell), oraTable, params);
 
 						/* if any element cannot be converted, give up */
 						if (element == NULL)
@@ -3685,12 +3662,12 @@ elog(DEBUG1, "T_OpExpr right");
 			if (! canHandleType(rightargtype))
 				return NULL;
 
-			left = deparseExpr(session, foreignrel, linitial(((DistinctExpr *)expr)->args), oraTable, params, use_alias);
+			left = deparseExpr(session, foreignrel, linitial(((DistinctExpr *)expr)->args), oraTable, params);
 			if (left == NULL)
 			{
 				return NULL;
 			}
-			right = deparseExpr(session, foreignrel, lsecond(((DistinctExpr *)expr)->args), oraTable, params, use_alias);
+			right = deparseExpr(session, foreignrel, lsecond(((DistinctExpr *)expr)->args), oraTable, params);
 			if (right == NULL)
 			{
 				pfree(left);
@@ -3714,12 +3691,12 @@ elog(DEBUG1, "T_OpExpr right");
 			if (! canHandleType(rightargtype))
 				return NULL;
 
-			left = deparseExpr(session, foreignrel, linitial(((NullIfExpr *)expr)->args), oraTable, params, use_alias);
+			left = deparseExpr(session, foreignrel, linitial(((NullIfExpr *)expr)->args), oraTable, params);
 			if (left == NULL)
 			{
 				return NULL;
 			}
-			right = deparseExpr(session, foreignrel, lsecond(((NullIfExpr *)expr)->args), oraTable, params, use_alias);
+			right = deparseExpr(session, foreignrel, lsecond(((NullIfExpr *)expr)->args), oraTable, params);
 			if (right == NULL)
 			{
 				pfree(left);
@@ -3733,7 +3710,7 @@ elog(DEBUG1, "T_OpExpr right");
 		case T_BoolExpr:
 			boolexpr = (BoolExpr *)expr;
 
-			arg = deparseExpr(session, foreignrel, linitial(boolexpr->args), oraTable, params, use_alias);
+			arg = deparseExpr(session, foreignrel, linitial(boolexpr->args), oraTable, params);
 			if (arg == NULL)
 				return NULL;
 
@@ -3744,7 +3721,7 @@ elog(DEBUG1, "T_OpExpr right");
 
 			for_each_cell(cell, lnext(list_head(boolexpr->args)))
 			{
-				arg = deparseExpr(session, foreignrel, (Expr *)lfirst(cell), oraTable, params, use_alias);
+				arg = deparseExpr(session, foreignrel, (Expr *)lfirst(cell), oraTable, params);
 				if (arg == NULL)
 				{
 					pfree(result.data);
@@ -3759,10 +3736,10 @@ elog(DEBUG1, "T_OpExpr right");
 
 			break;
 		case T_RelabelType:
-			return deparseExpr(session, foreignrel, ((RelabelType *)expr)->arg, oraTable, params, use_alias);
+			return deparseExpr(session, foreignrel, ((RelabelType *)expr)->arg, oraTable, params);
 			break;
 		case T_CoerceToDomain:
-			return deparseExpr(session, foreignrel, ((CoerceToDomain *)expr)->arg, oraTable, params, use_alias);
+			return deparseExpr(session, foreignrel, ((CoerceToDomain *)expr)->arg, oraTable, params);
 			break;
 		case T_CaseExpr:
 			caseexpr = (CaseExpr *)expr;
@@ -3776,7 +3753,7 @@ elog(DEBUG1, "T_OpExpr right");
 			/* for the form "CASE arg WHEN ...", add first expression */
 			if (caseexpr->arg != NULL)
 			{
-				arg = deparseExpr(session, foreignrel, caseexpr->arg, oraTable, params, use_alias);
+				arg = deparseExpr(session, foreignrel, caseexpr->arg, oraTable, params);
 				if (arg == NULL)
 				{
 					pfree(result.data);
@@ -3797,12 +3774,12 @@ elog(DEBUG1, "T_OpExpr right");
 				if (caseexpr->arg == NULL)
 				{
 					/* for CASE WHEN ..., use the whole expression */
-					arg = deparseExpr(session, foreignrel, whenclause->expr, oraTable, params, use_alias);
+					arg = deparseExpr(session, foreignrel, whenclause->expr, oraTable, params);
 				}
 				else
 				{
 					/* for CASE arg WHEN ..., use only the right branch of the equality */
-					arg = deparseExpr(session, foreignrel, lsecond(((OpExpr *)whenclause->expr)->args), oraTable, params, use_alias);
+					arg = deparseExpr(session, foreignrel, lsecond(((OpExpr *)whenclause->expr)->args), oraTable, params);
 				}
 
 				if (arg == NULL)
@@ -3817,7 +3794,7 @@ elog(DEBUG1, "T_OpExpr right");
 				}
 
 				/* THEN */
-				arg = deparseExpr(session, foreignrel, whenclause->result, oraTable, params, use_alias);
+				arg = deparseExpr(session, foreignrel, whenclause->result, oraTable, params);
 				if (arg == NULL)
 				{
 					pfree(result.data);
@@ -3833,7 +3810,7 @@ elog(DEBUG1, "T_OpExpr right");
 			/* append ELSE clause if appropriate */
 			if (caseexpr->defresult != NULL)
 			{
-				arg = deparseExpr(session, foreignrel, caseexpr->defresult, oraTable, params, use_alias);
+				arg = deparseExpr(session, foreignrel, caseexpr->defresult, oraTable, params);
 				if (arg == NULL)
 				{
 					pfree(result.data);
@@ -3861,7 +3838,7 @@ elog(DEBUG1, "T_OpExpr right");
 			first_arg = true;
 			foreach(cell, coalesceexpr->args)
 			{
-				arg = deparseExpr(session, foreignrel, (Expr *)lfirst(cell), oraTable, params, use_alias);
+				arg = deparseExpr(session, foreignrel, (Expr *)lfirst(cell), oraTable, params);
 				if (arg == NULL)
 				{
 					pfree(result.data);
@@ -3884,7 +3861,7 @@ elog(DEBUG1, "T_OpExpr right");
 
 			break;
 		case T_NullTest:
-			arg = deparseExpr(session, foreignrel, ((NullTest *)expr)->arg, oraTable, params, use_alias);
+			arg = deparseExpr(session, foreignrel, ((NullTest *)expr)->arg, oraTable, params);
 			if (arg == NULL)
 				return NULL;
 
@@ -3901,7 +3878,7 @@ elog(DEBUG1, "T_OpExpr right");
 
 			/* do nothing for implicit casts */
 			if (func->funcformat == COERCE_IMPLICIT_CAST)
-				return deparseExpr(session, foreignrel, linitial(func->args), oraTable, params, use_alias);
+				return deparseExpr(session, foreignrel, linitial(func->args), oraTable, params);
 
 			/* get function name and schema */
 			tuple = SearchSysCache1(PROCOID, ObjectIdGetDatum(func->funcid));
@@ -3981,7 +3958,7 @@ elog(DEBUG1, "T_OpExpr right");
 				first_arg = true;
 				foreach(cell, func->args)
 				{
-					arg = deparseExpr(session, foreignrel, lfirst(cell), oraTable, params, use_alias);
+					arg = deparseExpr(session, foreignrel, lfirst(cell), oraTable, params);
 					if (arg == NULL)
 					{
 						pfree(result.data);
@@ -4006,7 +3983,7 @@ elog(DEBUG1, "T_OpExpr right");
 			else if (strcmp(opername, "date_part") == 0)
 			{
 				/* special case: EXTRACT */
-				left = deparseExpr(session, foreignrel, linitial(func->args), oraTable, params, use_alias);
+				left = deparseExpr(session, foreignrel, linitial(func->args), oraTable, params);
 				if (left == NULL)
 				{
 					pfree(opername);
@@ -4026,7 +4003,7 @@ elog(DEBUG1, "T_OpExpr right");
 					/* remove final quote */
 					left[strlen(left) - 1] = '\0';
 
-					right = deparseExpr(session, foreignrel, lsecond(func->args), oraTable, params, use_alias);
+					right = deparseExpr(session, foreignrel, lsecond(func->args), oraTable, params);
 					if (right == NULL)
 					{
 						pfree(opername);
@@ -5198,7 +5175,7 @@ foreign_join_ok(PlannerInfo *root, RelOptInfo *joinrel, JoinType jointype,
 		char *tmp = NULL;
 		Expr *expr = (Expr *) lfirst(lc);
 
-		tmp = deparseExpr(fdwState->session, joinrel, expr, fdwState->oraTable, &(fdwState->params), false);
+		tmp = deparseExpr(fdwState->session, joinrel, expr, fdwState->oraTable, &(fdwState->params));
 		elog(DEBUG1, "tmp: %s", tmp);
 		if (tmp != NULL)
 			return false;
@@ -5230,7 +5207,7 @@ foreign_join_ok(PlannerInfo *root, RelOptInfo *joinrel, JoinType jointype,
 			can_pushdown = false;
 		}
 		
-		tmp = deparseExpr(fdwState->session, joinrel, expr, fdwState->oraTable, &(fdwState->params), false);
+		tmp = deparseExpr(fdwState->session, joinrel, expr, fdwState->oraTable, &(fdwState->params));
 		elog(DEBUG1,"otherclauses tmp: %s", tmp);
 		elog(DEBUG1,"can_pushdown: %d", can_pushdown);
 
