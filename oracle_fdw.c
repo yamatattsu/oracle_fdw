@@ -1113,8 +1113,6 @@ ForeignScan
 	Relation rel;
 	Index scan_relid;
 	List *local_exprs = NIL;
-	List *remote_conds = NIL;
-	List *remote_exprs = NIL;
 	List *fdw_scan_tlist = NIL;
 
 	struct OracleFdwState *fdwState = (struct OracleFdwState *)foreignrel->fdw_private;
@@ -1192,7 +1190,6 @@ ForeignScan
 		Assert(!scan_clauses);
 
 		/* For a join relation, get the conditions from fdw_private structure */
-		remote_conds = fdwState->remote_conds;
 		local_exprs = fdwState->local_conds;
 
 		/* Build the list of columns to be fetched from the foreign server. */
