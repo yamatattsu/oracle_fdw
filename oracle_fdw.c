@@ -2674,6 +2674,7 @@ getColumnData(Oid foreigntableid, struct oraTable *oraTable)
  * 		Untranslatable clauses are omitted and left for PostgreSQL to check.
  * 		"query_pathkeys" contains the desired sort order of the scan results
  * 		which will be translated to ORDER BY clauses if possible.
+ *		As a side effect, we also mark the used columns in oraTable.
  */
 char
 *createQuery(struct OracleFdwState *fdwState, RelOptInfo *foreignrel, bool modify, List *query_pathkeys)
