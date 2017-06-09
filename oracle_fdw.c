@@ -2864,7 +2864,7 @@ deparseFromExprForRel(StringInfo buf, RelOptInfo *foreignrel, List **params_list
 		appendStringInfo(buf, "(%s %s JOIN %s ON ", join_sql_o.data,
 					   get_jointype_name(fdwState->jointype), join_sql_i.data);
 
-		/* Append join clause; (TRUE) if no join clause */
+		/* Append join clause */
 		if (fdwState->joinclauses)
 		{
 
@@ -2880,8 +2880,6 @@ deparseFromExprForRel(StringInfo buf, RelOptInfo *foreignrel, List **params_list
 			appendConditions(fdwState->joinclauses, buf, foreignrel, params_list);
 			appendStringInfo(buf, ")");
 		}
-		else
-			appendStringInfoString(buf, "(TRUE)");
 
 		/* End the FROM clause entry. */
 		appendStringInfo(buf, ")");
