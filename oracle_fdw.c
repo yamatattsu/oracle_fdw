@@ -208,6 +208,7 @@ struct OracleFdwState {
 	MemoryContext temp_cxt;        /* short-lived memory for data modification */
 	unsigned int prefetch;         /* number of rows to prefetch */
 	char *order_clause;            /* for sort-pushdown */
+	char *where_clause;            /* deparsed where clause */
 
 	/*
 	 * True means that the relation can be pushed down. Always true for simple
@@ -798,6 +799,8 @@ oracleGetForeignRelSize(PlannerInfo *root, RelOptInfo *baserel, Oid foreigntable
 	List *remote_conds = NIL;
 	List *local_conds = NIL;
 	char *where;
+	StringInfoData where_clause;
+	bool first_col = true;
 
 	elog(DEBUG1, "oracle_fdw: plan foreign table scan on %d", foreigntableid);
 
@@ -812,6 +815,7 @@ oracleGetForeignRelSize(PlannerInfo *root, RelOptInfo *baserel, Oid foreigntable
 	fdwState->pushdown_safe = true;
 
 	/* classify remote_conds or local_conds. these parameter are used in foreign_join_ok and oracleGetForeignPlan. */
+	initStringInfo(&where_clause);
 	foreach(cell, conditions)
 	{
 		/* classify conditions to local_conds or remote_conds */
@@ -819,6 +823,17 @@ oracleGetForeignRelSize(PlannerInfo *root, RelOptInfo *baserel, Oid foreigntable
 		if (where != NULL) {
 			elog(DEBUG1, "remote_conds: %s", where);
 			remote_conds = lappend(remote_conds, ((RestrictInfo *)lfirst(cell))->clause);
+
+			/* append new WHERE clause to query string */
+			if (first_col)
+			{
+				first_col = false;
+				appendStringInfo(&where_clause, " WHERE %s", where);
+			}
+			else
+			{
+				appendStringInfo(&where_clause, " AND %s", where);
+			}
 			pfree(where);
 		}
 		else
@@ -826,6 +841,7 @@ oracleGetForeignRelSize(PlannerInfo *root, RelOptInfo *baserel, Oid foreigntable
 			local_conds = lappend(local_conds, ((RestrictInfo *)lfirst(cell))->clause);
 		}
 	}
+	fdwState->where_clause = where_clause.data;
 
 	/* set remote_conds and local_conds to fdwState for later use */
 	fdwState->remote_conds = remote_conds;
@@ -2489,6 +2505,7 @@ struct OracleFdwState
 	fdwState->paramList = NULL;
 	fdwState->temp_cxt = NULL;
 	fdwState->order_clause = NULL;
+	fdwState->where_clause = NULL;
 
 	/*
 	 * Get all relevant options from the foreign table, the user mapping,
@@ -2682,7 +2699,7 @@ char
 	ListCell *cell;
 	bool first_col = true, in_quote = false;
 	int i, index;
-	char *where, *wherecopy, *p, md5[33], parname[10];
+	char *wherecopy, *p, md5[33], parname[10];
 	StringInfoData query, result;
 	List *columnlist,
 		*conditions = foreignrel->baserestrictinfo;
@@ -2755,25 +2772,8 @@ char
 								&(fdwState->params));
 
 		/* append WHERE clauses */
-		first_col = true;
-		foreach(cell, conditions)
-		{
-			/* try to convert each condition to Oracle SQL */
-			where = deparseExpr(fdwState->session, foreignrel, ((RestrictInfo *)lfirst(cell))->clause, fdwState->oraTable, &(fdwState->params));
-			if (where != NULL) {
-				/* append new WHERE clause to query string */
-				if (first_col)
-				{
-					first_col = false;
-					appendStringInfo(&query, " WHERE %s", where);
-				}
-				else
-				{
-					appendStringInfo(&query, " AND %s", where);
-				}
-				pfree(where);
-			}
-		}
+		if (fdwState->where_clause)
+			appendStringInfo(&query, "%s", fdwState->where_clause);	
 	}
 
 	/* append ORDER BY clause if all columns can be pushed down */
