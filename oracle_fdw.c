@@ -3171,6 +3171,7 @@ deparseExpr(oracleSession *session, RelOptInfo *foreignrel, Expr *expr, const st
 	bool first_arg, isNull;
 	int index;
 	StringInfoData alias;
+	const struct oraTable *var_table;  /* oraTable that belongs to a Var */
 
 	if (expr == NULL)
 		return NULL;
@@ -3237,10 +3238,28 @@ deparseExpr(oracleSession *session, RelOptInfo *foreignrel, Expr *expr, const st
 #endif  /* OLD_FDW_API */
 		case T_Var:
 			variable = (Var *)expr;
+			var_table = NULL;
 
-			if (variable->varno == foreignrel->relid && variable->varlevelsup == 0)
+			/* check if the variable belongs to one of our foreign tables */
+			if (foreignrel->reloptkind == RELOPT_JOINREL)
 			{
-				/* the variable belongs to the foreign table, replace it with the name */
+				struct OracleFdwState *joinstate = (struct OracleFdwState *)foreignrel->fdw_private;
+				struct OracleFdwState *outerstate = (struct OracleFdwState *)joinstate->outerrel->fdw_private;
+				struct OracleFdwState *innerstate = (struct OracleFdwState *)joinstate->innerrel->fdw_private;
+
+				/* we can't get here if the foreign table has no columns, so this is safe */
+				if (variable->varno == outerstate->oraTable->cols[0]->varno && variable->varlevelsup == 0)
+					var_table = outerstate->oraTable;
+				if (variable->varno == innerstate->oraTable->cols[0]->varno && variable->varlevelsup == 0)
+					var_table = innerstate->oraTable;
+			}
+			else
+				if (variable->varno == foreignrel->relid && variable->varlevelsup == 0)
+					var_table = oraTable;
+
+			if (var_table)
+			{
+				/* the variable belongs to a foreign table, replace it with the name */
 
 				/* we cannot handle system columns */
 				if (variable->varattno < 1)
@@ -3253,9 +3272,9 @@ deparseExpr(oracleSession *session, RelOptInfo *foreignrel, Expr *expr, const st
 				if (! (canHandleType(variable->vartype) || variable->vartype == BOOLOID))
 					return NULL;
 
-				/* get oraTable column index corresponding to this column (-1 if none) */
-				index = oraTable->ncols - 1;
-				while (index >= 0 && oraTable->cols[index]->pgattnum != variable->varattno)
+				/* get var_table column index corresponding to this column (-1 if none) */
+				index = var_table->ncols - 1;
+				while (index >= 0 && var_table->cols[index]->pgattnum != variable->varattno)
 					--index;
 
 				/* if no Oracle column corresponds, translate as NULL */
@@ -3271,7 +3290,7 @@ deparseExpr(oracleSession *session, RelOptInfo *foreignrel, Expr *expr, const st
 				 * converted from a non-string type in Oracle to a string type
 				 * in PostgreSQL because functions and operators won't work the same.
 				 */
-				oratype = oraTable->cols[index]->oratype;
+				oratype = var_table->cols[index]->oratype;
 				if ((variable->vartype == TEXTOID
 						|| variable->vartype == BPCHAROID
 						|| variable->vartype == VARCHAROID)
@@ -3291,13 +3310,13 @@ deparseExpr(oracleSession *session, RelOptInfo *foreignrel, Expr *expr, const st
 				}
 
 elog(DEBUG1, "index: %d", index);
-elog(DEBUG1, "T_Var oraTable->cols[index]->name: %s", oraTable->cols[index]->name);
+elog(DEBUG1, "T_Var var_table->cols[index]->name: %s", var_table->cols[index]->name);
 
 				/* RELOPT_JOINREL needs alias such as r1, r2. */
 				initStringInfo(&alias);
-				ADD_REL_QUALIFIER(&alias, oraTable->cols[index]->varno); /* create aliase from varno */
+				ADD_REL_QUALIFIER(&alias, var_table->cols[index]->varno); /* create aliase from varno */
 
-				appendStringInfo(&result, "%s%s", alias.data, oraTable->cols[index]->name);
+				appendStringInfo(&result, "%s%s", alias.data, var_table->cols[index]->name);
 
 				/* work around the lack of booleans in Oracle */
 				if (variable->vartype == BOOLOID)
@@ -3395,26 +3414,7 @@ elog(DEBUG1, "T_Var oraTable->cols[index]->name: %s", oraTable->cols[index]->nam
 				|| strcmp(opername, "|/") == 0
 				|| strcmp(opername, "@") == 0)
 			{
-
-elog(DEBUG1, "T_OpExpr left");
-				/* if RELOPT_JOINREL and oraTable are NULL, We get oraTable from outerrel and set it to deparseExpr. */
-				if(foreignrel->reloptkind == RELOPT_JOINREL)
-				{
-					RelOptInfo *outerrel = ((struct OracleFdwState *)foreignrel->fdw_private)->outerrel;
-					struct OracleFdwState *fdwState_o = (struct OracleFdwState *)outerrel->fdw_private;
-
-					Assert(oraTable == NULL);
-
-					elog(DEBUG1,"left is RELOPT_JOINREL");
-					left = deparseExpr(session, outerrel, linitial(oper->args), fdwState_o->oraTable, params);
-					elog(DEBUG1,"left: %s", left);
-				}
-				else
-				{
-					elog(DEBUG1,"left is not RELOPT_JOINREL");
-					left = deparseExpr(session, foreignrel, linitial(oper->args), oraTable, params);
-				}
-
+				left = deparseExpr(session, foreignrel, linitial(oper->args), oraTable, params);
 				if (left == NULL)
 				{
 					pfree(opername);
@@ -3423,22 +3423,8 @@ elog(DEBUG1, "T_OpExpr left");
 
 				if (oprkind == 'b')
 				{
-elog(DEBUG1, "T_OpExpr right");
 					/* binary operator */
-					/* if RELOPT_JOINREL and oraTable are NULL, We get oraTable from outerrel and set it to deparseExpr. */
-					if(foreignrel->reloptkind == RELOPT_JOINREL)
-					{
-						RelOptInfo *innerrel = ((struct OracleFdwState *)foreignrel->fdw_private)->innerrel;
-						struct OracleFdwState *fdwState_i = (struct OracleFdwState *)innerrel->fdw_private;
-
-						right = deparseExpr(session, innerrel, lsecond(oper->args), fdwState_i->oraTable, params);
-						elog(DEBUG1,"right: %s", right);
-					}
-					else
-					{
-						right = deparseExpr(session, foreignrel, lsecond(oper->args), oraTable, params);
-					}
-
+					right = deparseExpr(session, foreignrel, lsecond(oper->args), oraTable, params);
 					if (right == NULL)
 					{
 						pfree(left);
