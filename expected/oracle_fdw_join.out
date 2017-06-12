@@ -324,6 +324,18 @@ EXPLAIN (VERBOSE on, COSTS off) SELECT t1.id, t2.id FROM typetest1 t1, typetest2
    Oracle plan:     TABLE ACCESS FULL TYPETEST2
 (7 rows)
 
+EXPLAIN (VERBOSE on, COSTS off) SELECT t1.id, t2.id FROM typetest1 t1 JOIN typetest2 t2 on (t1.id + t2.id = 2);
+                                                                          QUERY PLAN                                                                           
+---------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Foreign Scan
+   Output: t1.id, t2.id
+   Oracle query: SELECT /*5ea4ad77951cb483ef19df0d54ed87ed*/ r1."ID", r2."ID" FROM ("TYPETEST1" r1 INNER JOIN "TYPETEST2" r2 ON ((((r1."ID" + r2."ID") = 2))))
+   Oracle plan: SELECT STATEMENT
+   Oracle plan:   NESTED LOOPS
+   Oracle plan:     TABLE ACCESS FULL TYPETEST2
+   Oracle plan:     TABLE ACCESS FULL TYPETEST1  (filter "R1"."ID"+"R2"."ID"=2)
+(7 rows)
+
 SELECT t1.id, t2.id FROM typetest1 t1, typetest2 t2 WHERE t1.id = t2.id;
  id | id 
 ----+----
@@ -401,6 +413,12 @@ SELECT t1.id, t2.id FROM typetest1 t1, typetest2 t2 WHERE t1.ts = t2.ts;
   3 |  3
   1 |  1
 (2 rows)
+
+SELECT t1.id, t2.id FROM typetest1 t1 JOIN typetest2 t2 on (t1.id + t2.id = 2);
+ id | id 
+----+----
+  1 |  1
+(1 row)
 
 /* Pushdown: NG */
 /* Inner join */
