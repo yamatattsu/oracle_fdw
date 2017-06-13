@@ -2865,6 +2865,7 @@ deparseFromExprForRel(StringInfo buf, RelOptInfo *foreignrel, List **params_list
 					   get_jointype_name(fdwState->jointype), join_sql_i.data);
 
 		/* Append join clause */
+		Assert(fdwState->joinclauses);
 		if (fdwState->joinclauses)
 		{
 
