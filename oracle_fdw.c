@@ -2917,7 +2917,6 @@ appendConditions(List *exprs, StringInfo buf,
 	bool is_first = true;
 	char *where;
 
-	/* Make sure any constants in the exprs are printed portably */
 	foreach(lc, exprs)
 	{
 		Expr  *expr = (Expr *) lfirst(lc);
