@@ -2865,22 +2865,16 @@ deparseFromExprForRel(StringInfo buf, RelOptInfo *foreignrel, List **params_list
 					   get_jointype_name(fdwState->jointype), join_sql_i.data);
 
 		/* Append join clause */
+		if(foreignrel->reloptkind == RELOPT_JOINREL)
+			elog(DEBUG1, "foreignrel is RELOPT_JOINREL");
+		else
+			elog(DEBUG1, "foreignrel is not RELOPT_JOINREL");
+
+		appendStringInfo(buf, "(");
+		/* we can only get here if the join is pushed down, so there are join clauses */
 		Assert(fdwState->joinclauses);
-		if (fdwState->joinclauses)
-		{
-
-			if(foreignrel->reloptkind == RELOPT_JOINREL){
-				elog(DEBUG1, "foreignrel is RELOPT_JOINREL");
-			}
-			else
-			{
-				elog(DEBUG1, "foreignrel is not RELOPT_JOINREL");
-			}
-
-			appendStringInfo(buf, "(");
-			appendConditions(fdwState->joinclauses, buf, foreignrel, params_list);
-			appendStringInfo(buf, ")");
-		}
+		appendConditions(fdwState->joinclauses, buf, foreignrel, params_list);
+		appendStringInfo(buf, ")");
 
 		/* End the FROM clause entry. */
 		appendStringInfo(buf, ")");
