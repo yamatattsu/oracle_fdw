@@ -5254,10 +5254,9 @@ foreign_join_ok(PlannerInfo *root, RelOptInfo *joinrel, JoinType jointype,
 	fdwState->user = NULL;
 
 	/*
-	 * Set fetch size to maximum of the joining sides, since we are expecting
-	 * the rows returned by the join to be proportional to the relation sizes.
+	 * Set fetch size to minimum of the joining sides
 	 */
-	if (fdwState_o->prefetch > fdwState_i->prefetch)
+	if (fdwState_o->prefetch < fdwState_i->prefetch)
 		fdwState->prefetch = fdwState_o->prefetch;
 	else
 		fdwState->prefetch = fdwState_i->prefetch;
