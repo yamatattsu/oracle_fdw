@@ -5284,11 +5284,8 @@ foreign_join_ok(PlannerInfo *root, RelOptInfo *joinrel, JoinType jointype,
 			}
 		}
 		if (!col)
-		{
-			return false; 
-		}
+			elog(ERROR, "foreign_join_ok internal error: column not found in base table");
 
-		Assert(col);
 		newcol = (struct oraColumn*) palloc0(sizeof(struct oraColumn));
 		memcpy(newcol, col, sizeof(struct oraColumn));
 		newcol->used = 1;
