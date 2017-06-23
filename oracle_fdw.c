@@ -5097,12 +5097,6 @@ foreign_join_ok(PlannerInfo *root, RelOptInfo *joinrel, JoinType jointype,
 		return false;
 
 	/*
-	if (jointype != JOIN_INNER && jointype != JOIN_LEFT &&
-		jointype != JOIN_RIGHT && jointype != JOIN_FULL)
-		return false;
-	*/
-
-	/*
 	 * If either of the joining relations is marked as unsafe to pushdown, the
 	 * join can not be pushed down.
 	 */
@@ -5124,12 +5118,6 @@ foreign_join_ok(PlannerInfo *root, RelOptInfo *joinrel, JoinType jointype,
 	/* Separate restrict list into join quals and quals on join relation */
 
 	/* Only support INNER_JOIN */
-	/*
-	if (IS_OUTER_JOIN(jointype))
-		extract_actual_join_clauses(extra->restrictlist, &joinclauses, &otherclauses);
-	else
-	{
-	*/
 	if (jointype == JOIN_INNER){
 		/*
 		 * Unlike an outer join, for inner join, the join result contains only
@@ -5145,19 +5133,6 @@ foreign_join_ok(PlannerInfo *root, RelOptInfo *joinrel, JoinType jointype,
 	fdwState->outerrel = outerrel;
 	fdwState->innerrel = innerrel;
 	fdwState->jointype = jointype;
-
-	/* Join quals must be safe to push down. */
-	/* JOIN_INNER: skip */
-	foreach(lc, joinclauses)
-	{
-		char *tmp = NULL;
-		Expr *expr = (Expr *) lfirst(lc);
-
-		tmp = deparseExpr(fdwState->session, joinrel, expr, fdwState->oraTable, &(fdwState->params));
-		elog(DEBUG1, "tmp: %s", tmp);
-		if (tmp != NULL)
-			return false;
-	}
 
 	/* Save the join clauses, for later use. */
 	fdwState->joinclauses = joinclauses;
