@@ -211,12 +211,6 @@ struct OracleFdwState {
 	char *where_clause;            /* deparsed where clause */
 
 	/*
-	 * True means that the relation can be pushed down. Always true for simple
-	 * foreign scan.
-	 */
-	bool        pushdown_safe;
-
-	/*
 	 * Restriction clauses, divided into safe and unsafe to pushdown subsets.
 	 *
 	 * For a base foreign relation this is a list of clauses along-with
@@ -811,9 +805,6 @@ oracleGetForeignRelSize(PlannerInfo *root, RelOptInfo *baserel, Oid foreigntable
 		fdwState->oraTable->cols[i]->varno = baserel->relid;
 	}
 
-	/* Base foreign tables need to be push down always. */
-	fdwState->pushdown_safe = true;
-
 	/* classify remote_conds or local_conds. these parameter are used in foreign_join_ok and oracleGetForeignPlan. */
 	initStringInfo(&where_clause);
 	foreach(cell, conditions)
@@ -1055,7 +1046,6 @@ oracleGetForeignJoinPaths(PlannerInfo *root,
 	 * the entry.
 	 */
 	fdwState = (struct OracleFdwState *) palloc0(sizeof(struct OracleFdwState));
-	fdwState->pushdown_safe = false;
 
 	joinrel->fdw_private = fdwState;
 
@@ -5103,8 +5093,7 @@ foreign_join_ok(PlannerInfo *root, RelOptInfo *joinrel, JoinType jointype,
 	fdwState = (struct OracleFdwState *) joinrel->fdw_private;
 	fdwState_o = (struct OracleFdwState *) outerrel->fdw_private;
 	fdwState_i = (struct OracleFdwState *) innerrel->fdw_private;
-	if (!fdwState_o || !fdwState_o->pushdown_safe ||
-		!fdwState_i || !fdwState_i->pushdown_safe)
+	if (!fdwState_o || !fdwState_i)
 		return false;
 
 	/*
@@ -5221,9 +5210,6 @@ foreign_join_ok(PlannerInfo *root, RelOptInfo *joinrel, JoinType jointype,
 		fdwState->joinclauses = fdwState->remote_conds;
 		fdwState->remote_conds = NIL;
 	}
-
-	/* Mark that this join can be pushed down safely */
-	fdwState->pushdown_safe = true;
 
 	/* Get user mapping */
 	fdwState->user = NULL;
