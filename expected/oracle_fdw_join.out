@@ -332,8 +332,8 @@ EXPLAIN (VERBOSE on, COSTS off) SELECT t1.id, t2.id FROM typetest1 t1 JOIN typet
    Oracle query: SELECT /*5ea4ad77951cb483ef19df0d54ed87ed*/ r1."ID", r2."ID" FROM ("TYPETEST1" r1 INNER JOIN "TYPETEST2" r2 ON ((((r1."ID" + r2."ID") = 2))))
    Oracle plan: SELECT STATEMENT
    Oracle plan:   NESTED LOOPS
-   Oracle plan:     TABLE ACCESS FULL TYPETEST2
-   Oracle plan:     TABLE ACCESS FULL TYPETEST1  (filter "R1"."ID"+"R2"."ID"=2)
+   Oracle plan:     TABLE ACCESS FULL TYPETEST1
+   Oracle plan:     TABLE ACCESS FULL TYPETEST2  (filter "R1"."ID"+"R2"."ID"=2)
 (7 rows)
 
 SELECT t1.id, t2.id FROM typetest1 t1, typetest2 t2 WHERE t1.id = t2.id;
@@ -423,8 +423,25 @@ SELECT t1.id, t2.id FROM typetest1 t1 JOIN typetest2 t2 on (t1.id + t2.id = 2);
 /* Pushdown: NG */
 /* Inner join */
 EXPLAIN (VERBOSE on, COSTS off) SELECT t1.id, t2.id FROM typetest1 t1, typetest2 t2 WHERE t1.lc = t2.lc;
-ERROR:  error describing query: OCIStmtExecute failed to describe remote query
-DETAIL:  ORA-00932: inconsistent datatypes: expected - got CLOB
+                                                  QUERY PLAN                                                  
+--------------------------------------------------------------------------------------------------------------
+ Hash Join
+   Output: t1.id, t2.id
+   Hash Cond: (t1.lc = t2.lc)
+   ->  Foreign Scan on public.typetest1 t1
+         Output: t1.id, t1.lc
+         Oracle query: SELECT /*642c23ec045edf416286adc5ac67d720*/ r1."ID", r1."LC" FROM "TYPETEST1" r1
+         Oracle plan: SELECT STATEMENT
+         Oracle plan:   TABLE ACCESS FULL TYPETEST1
+   ->  Hash
+         Output: t2.id, t2.lc
+         ->  Foreign Scan on public.typetest2 t2
+               Output: t2.id, t2.lc
+               Oracle query: SELECT /*649710c2f86b7cc8099519bc0047764d*/ r2."ID", r2."LC" FROM "TYPETEST2" r2
+               Oracle plan: SELECT STATEMENT
+               Oracle plan:   TABLE ACCESS FULL TYPETEST2
+(15 rows)
+
 EXPLAIN (VERBOSE on, COSTS off) SELECT t1.id, t2.id FROM typetest1 t1, typetest2 t2 WHERE t1.r = t2.r;
                                                  QUERY PLAN                                                  
 -------------------------------------------------------------------------------------------------------------
@@ -566,8 +583,13 @@ EXPLAIN (VERBOSE on, COSTS off) SELECT t1.id, t2.id FROM typetest1 t1, typetest2
 (15 rows)
 
 SELECT t1.id, t2.id FROM typetest1 t1, typetest2 t2 WHERE t1.lc = t2.lc;
-ERROR:  error executing query: OCIStmtExecute failed to execute remote query
-DETAIL:  ORA-00932: inconsistent datatypes: expected - got CLOB
+ id | id 
+----+----
+  3 |  3
+  4 |  4
+  1 |  1
+(3 rows)
+
 SELECT t1.id, t2.id FROM typetest1 t1, typetest2 t2 WHERE t1.r = t2.r;
  id | id 
 ----+----
