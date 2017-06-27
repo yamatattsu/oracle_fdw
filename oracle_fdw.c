@@ -1050,7 +1050,6 @@ oracleGetForeignJoinPaths(PlannerInfo *root,
 	joinrel->fdw_private = fdwState;
 
 	/* ToDo: to get epq_path for CMD_DELETE and CMD_UPDATE .*/
-	/* For Now, the code is commented out. */
 	if (!foreign_join_ok(root, joinrel, jointype, outerrel, innerrel, extra))
 	{
 		elog(DEBUG1, "!foreign_join_ok");
@@ -1063,7 +1062,6 @@ oracleGetForeignJoinPaths(PlannerInfo *root,
 	}
 
 	/* ToDo: cost estimations for join relation */
-	/* For now, set lowest cost information to the joinrel */
 	rows = 1;
 	startup_cost = 1;
 	total_cost = 1;
@@ -1092,7 +1090,6 @@ oracleGetForeignJoinPaths(PlannerInfo *root,
 	/* Add generated path into joinrel by add_path(). */
 	add_path(joinrel, (Path *) joinpath);
 
-	/* Currently, I don't think that a combination of JOIN pushdown and SORT pushdown. So comment out.*/
 	/* ToDo: consider cobination of join pushdown with sort pushdown
 			 and consider pathkeys for the join relation. */
 	/*
@@ -5227,7 +5224,6 @@ foreign_join_ok(PlannerInfo *root, RelOptInfo *joinrel, JoinType jointype,
 	fdwState->password = fdwState_o->password;
 	fdwState->nls_lang = fdwState_o->nls_lang;
 
-	/* I use mergeFdwState as reference */
 	/* Construct oraTable for the result of join */
 	oraTable_o = fdwState_o->oraTable;
 	oraTable_i = fdwState_i->oraTable;
