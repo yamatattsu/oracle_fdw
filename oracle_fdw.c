@@ -5130,12 +5130,8 @@ foreign_join_ok(PlannerInfo *root, RelOptInfo *joinrel, JoinType jointype,
 	fdwState->joinclauses = joinclauses;
 
 	/*
-	 * Other clauses are applied after the join has been performed and thus
-	 * need not be all pushable. We will push those which can be pushed to
-	 * reduce the number of rows fetched from the foreign server. Rest of them
-	 * will be applied locally after fetching join result. Add them to fdwState
-	 * so that other joins involving this joinrel will know that this joinrel
-	 * has local clauses.
+	 * For inner joins, "otherclauses" contains join and WHERE conditions.
+	 * Check which ones can be pushed down.
 	 */
 	foreach(lc, otherclauses)
 	{
