@@ -5132,30 +5132,19 @@ foreign_join_ok(PlannerInfo *root, RelOptInfo *joinrel, JoinType jointype,
 	 */
 	foreach(lc, otherclauses)
 	{
-		bool can_pushdown = true;
-		Oid type;
 		char *tmp = NULL;
 		Expr *expr = (Expr *) lfirst(lc);
-
-		type = exprType((Node *)expr);
-		if (type != INT8OID && type != INT2OID && type != INT4OID && type != OIDOID
-				&& type != FLOAT4OID && type != FLOAT8OID && type != NUMERICOID && type != DATEOID
-				&& type != TIMESTAMPOID && type != TIMESTAMPTZOID && type != INTERVALOID)
-		{
-			can_pushdown = false;
-		}
-		
+	
 		tmp = deparseExpr(fdwState->session, joinrel, expr, fdwState->oraTable, &(fdwState->params));
 		elog(DEBUG1,"otherclauses tmp: %s", tmp);
-		elog(DEBUG1,"can_pushdown: %d", can_pushdown);
 
-		if (can_pushdown == false && tmp == NULL)
-				fdwState->local_conds = lappend(fdwState->local_conds, expr);
+		if (tmp == NULL)
+			fdwState->local_conds = lappend(fdwState->local_conds, expr);
 		else
-				fdwState->remote_conds = lappend(fdwState->remote_conds, expr);
+			fdwState->remote_conds = lappend(fdwState->remote_conds, expr);
 	}
 
-	if(fdwState->remote_conds == NIL)
+	if(fdwState->local_conds != NIL)
 		return false;
 
 	/*
