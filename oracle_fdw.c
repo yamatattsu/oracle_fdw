@@ -5127,7 +5127,7 @@ foreign_join_ok(PlannerInfo *root, RelOptInfo *joinrel, JoinType jointype,
 	fdwState->joinclauses = joinclauses;
 
 	/*
-	 * For inner joins, "otherclauses" contains join and WHERE conditions.
+	 * For inner joins, "otherclauses" contains now the join conditions.
 	 * Check which ones can be pushed down.
 	 */
 	foreach(lc, otherclauses)
@@ -5144,6 +5144,20 @@ foreign_join_ok(PlannerInfo *root, RelOptInfo *joinrel, JoinType jointype,
 			fdwState->remote_conds = lappend(fdwState->remote_conds, expr);
 	}
 
+	/*
+	 * Only push down joins for which all join conditions can be pushed down.
+	 *
+	 * For an inner join it would be ok to only push own some of the join
+	 * conditions and evaluate the others locally, but we cannot be certain
+	 * that such a plan is a good or even a feasible one:
+	 * With one of the join conditions missing in the pushed down query,
+	 * it could be that the "intermediate" join result fetched from the Oracle
+	 * side has many more rows than the complete join result.
+	 *
+	 * Since we have no good way to estimate the number of rows returned for
+	 * such a join where not all join conditions can be pushed down, we choose
+	 * the safe road of not pushing down such joins at all.
+	 */
 	if(fdwState->local_conds != NIL)
 		return false;
 
