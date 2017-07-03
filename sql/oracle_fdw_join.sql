@@ -148,6 +148,17 @@ SELECT t1.id FROM typetest1 t1 WHERE EXISTS (SELECT t2.id FROM typetest2 t2 WHER
 EXPLAIN (VERBOSE on, COSTS off) SELECT t1.id FROM typetest1 t1 WHERE NOT EXISTS (SELECT t2.id FROM typetest2 t2 WHERE t1.id = t2.id);
 SELECT t1.id FROM typetest1 t1 WHERE NOT EXISTS (SELECT t2.id FROM typetest2 t2 WHERE t1.id = t2.id);
 
+/* Cross join */
+EXPLAIN (VERBOSE on, COSTS off) SELECT t1.id, t2.id FROM typetest1 t1, typetest2 t2 ORDER BY t1.id, t2.id;
+EXPLAIN (VERBOSE on, COSTS off) SELECT t1.id, t2.id FROM typetest1 t1 JOIN typetest2 t2 ON true ORDER BY t1.id, t2.id;
+
+SELECT t1.id, t2.id FROM typetest1 t1, typetest2 t2 ORDER BY t1.id, t2.id;
+SELECT t1.id, t2.id FROM typetest1 t1 JOIN typetest2 t2 ON true ORDER BY t1.id, t2.id;
+
+/* Natural join */
+EXPLAIN (VERBOSE on, COSTS off) SELECT t1.id, t2.id FROM typetest1 t1 NATURAL JOIN typetest2 t2 ORDER BY t1.id, t2.id;
+SELECT t1.id, t2.id FROM typetest1 t1 NATURAL JOIN typetest2 t2 ORDER BY t1.id, t2.id;
+
 /* 3-way join */
 CREATE FOREIGN TABLE typetest3 (
    id  integer OPTIONS (key 'yes') NOT NULL,

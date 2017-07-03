@@ -5161,6 +5161,10 @@ foreign_join_ok(PlannerInfo *root, RelOptInfo *joinrel, JoinType jointype,
 	if(fdwState->local_conds != NIL)
 		return false;
 
+	/* CROSS JOIN (T1 JOIN T2 ON true) is not pushed down */
+	if(fdwState->remote_conds == NIL)
+		return false;
+
 	/*
 	 * Pull the other remote conditions from the joining relations into join
 	 * clauses or other remote clauses (remote_conds) of this relation

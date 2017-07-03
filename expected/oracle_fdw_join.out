@@ -834,6 +834,116 @@ SELECT t1.id FROM typetest1 t1 WHERE NOT EXISTS (SELECT t2.id FROM typetest2 t2 
 ----
 (0 rows)
 
+/* Cross join */
+EXPLAIN (VERBOSE on, COSTS off) SELECT t1.id, t2.id FROM typetest1 t1, typetest2 t2 ORDER BY t1.id, t2.id;
+                                                QUERY PLAN                                                 
+-----------------------------------------------------------------------------------------------------------
+ Sort
+   Output: t1.id, t2.id
+   Sort Key: t1.id, t2.id
+   ->  Nested Loop
+         Output: t1.id, t2.id
+         ->  Foreign Scan on public.typetest1 t1
+               Output: t1.id
+               Oracle query: SELECT /*709894645e7b46ee7c82f53e6eeb7cac*/ r1."ID" FROM "TYPETEST1" r1
+               Oracle plan: SELECT STATEMENT
+               Oracle plan:   TABLE ACCESS FULL TYPETEST1
+         ->  Materialize
+               Output: t2.id
+               ->  Foreign Scan on public.typetest2 t2
+                     Output: t2.id
+                     Oracle query: SELECT /*327022dc461ec688545fd1303850f6e4*/ r2."ID" FROM "TYPETEST2" r2
+                     Oracle plan: SELECT STATEMENT
+                     Oracle plan:   TABLE ACCESS FULL TYPETEST2
+(17 rows)
+
+EXPLAIN (VERBOSE on, COSTS off) SELECT t1.id, t2.id FROM typetest1 t1 JOIN typetest2 t2 ON true ORDER BY t1.id, t2.id;
+                                                QUERY PLAN                                                 
+-----------------------------------------------------------------------------------------------------------
+ Sort
+   Output: t1.id, t2.id
+   Sort Key: t1.id, t2.id
+   ->  Nested Loop
+         Output: t1.id, t2.id
+         ->  Foreign Scan on public.typetest1 t1
+               Output: t1.id
+               Oracle query: SELECT /*709894645e7b46ee7c82f53e6eeb7cac*/ r1."ID" FROM "TYPETEST1" r1
+               Oracle plan: SELECT STATEMENT
+               Oracle plan:   TABLE ACCESS FULL TYPETEST1
+         ->  Materialize
+               Output: t2.id
+               ->  Foreign Scan on public.typetest2 t2
+                     Output: t2.id
+                     Oracle query: SELECT /*327022dc461ec688545fd1303850f6e4*/ r2."ID" FROM "TYPETEST2" r2
+                     Oracle plan: SELECT STATEMENT
+                     Oracle plan:   TABLE ACCESS FULL TYPETEST2
+(17 rows)
+
+SELECT t1.id, t2.id FROM typetest1 t1, typetest2 t2 ORDER BY t1.id, t2.id;
+ id | id 
+----+----
+  1 |  1
+  1 |  2
+  1 |  3
+  1 |  4
+  3 |  1
+  3 |  2
+  3 |  3
+  3 |  4
+  4 |  1
+  4 |  2
+  4 |  3
+  4 |  4
+(12 rows)
+
+SELECT t1.id, t2.id FROM typetest1 t1 JOIN typetest2 t2 ON true ORDER BY t1.id, t2.id;
+ id | id 
+----+----
+  1 |  1
+  1 |  2
+  1 |  3
+  1 |  4
+  3 |  1
+  3 |  2
+  3 |  3
+  3 |  4
+  4 |  1
+  4 |  2
+  4 |  3
+  4 |  4
+(12 rows)
+
+/* Natural join */
+EXPLAIN (VERBOSE on, COSTS off) SELECT t1.id, t2.id FROM typetest1 t1 NATURAL JOIN typetest2 t2 ORDER BY t1.id, t2.id;
+                                                                                                                                                                                           QUERY PLAN                                                                                                                                                                                           
+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Merge Join
+   Output: t1.id, t2.id
+   Merge Cond: (t1.id = t2.id)
+   Join Filter: ((t1.c = t2.c) AND (t1.nc = t2.nc) AND ((t1.vc)::text = (t2.vc)::text) AND ((t1.nvc)::text = (t2.nvc)::text) AND (t1.lc = t2.lc) AND (t1.r = t2.r) AND (t1.u = t2.u) AND (t1.lb = t2.lb) AND (t1.lr = t2.lr) AND (t1.b = t2.b) AND (t1.num = t2.num) AND (t1.fl = t2.fl) AND (t1.db = t2.db) AND (t1.d = t2.d) AND (t1.ts = t2.ts) AND (t1.ids = t2.ids) AND (t1.iym = t2.iym))
+   ->  Foreign Scan on public.typetest1 t1
+         Output: t1.id, t1.c, t1.nc, t1.vc, t1.nvc, t1.lc, t1.r, t1.u, t1.lb, t1.lr, t1.b, t1.num, t1.fl, t1.db, t1.d, t1.ts, t1.ids, t1.iym
+         Oracle query: SELECT /*55ecbbb95e45509505612d4ba8184bbb*/ r1."ID", r1."C", r1."NC", r1."VC", r1."NVC", r1."LC", r1."R", r1."U", r1."LB", r1."LR", r1."B", r1."NUM", r1."FL", r1."DB", r1."D", r1."TS", r1."IDS", r1."IYM" FROM "TYPETEST1" r1 ORDER BY r1."ID" ASC NULLS LAST
+         Oracle plan: SELECT STATEMENT
+         Oracle plan:   SORT ORDER BY
+         Oracle plan:     TABLE ACCESS FULL TYPETEST1
+   ->  Materialize
+         Output: t2.id, t2.c, t2.nc, t2.vc, t2.nvc, t2.lc, t2.r, t2.u, t2.lb, t2.lr, t2.b, t2.num, t2.fl, t2.db, t2.d, t2.ts, t2.ids, t2.iym
+         ->  Foreign Scan on public.typetest2 t2
+               Output: t2.id, t2.c, t2.nc, t2.vc, t2.nvc, t2.lc, t2.r, t2.u, t2.lb, t2.lr, t2.b, t2.num, t2.fl, t2.db, t2.d, t2.ts, t2.ids, t2.iym
+               Oracle query: SELECT /*94e0cf9c96ea7ac071d4424ef5ef34a4*/ r2."ID", r2."C", r2."NC", r2."VC", r2."NVC", r2."LC", r2."R", r2."U", r2."LB", r2."LR", r2."B", r2."NUM", r2."FL", r2."DB", r2."D", r2."TS", r2."IDS", r2."IYM" FROM "TYPETEST2" r2 ORDER BY r2."ID" ASC NULLS LAST
+               Oracle plan: SELECT STATEMENT
+               Oracle plan:   SORT ORDER BY
+               Oracle plan:     TABLE ACCESS FULL TYPETEST2
+(18 rows)
+
+SELECT t1.id, t2.id FROM typetest1 t1 NATURAL JOIN typetest2 t2 ORDER BY t1.id, t2.id;
+ id | id 
+----+----
+  1 |  1
+  3 |  3
+(2 rows)
+
 /* 3-way join */
 CREATE FOREIGN TABLE typetest3 (
    id  integer OPTIONS (key 'yes') NOT NULL,
