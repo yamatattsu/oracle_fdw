@@ -2749,19 +2749,12 @@ char
 	if (first_col)
 		appendStringInfo(&query, "'1'");
 
-	/* append FROM clause and WHERE clause*/
-	if (foreignrel->reloptkind == RELOPT_JOINREL)
-	{
-		appendStringInfo(&query, " FROM ");
-		deparseFromExprForRel(&query, foreignrel,
-								&(fdwState->params));	
-	}
-	else
-	{
-		appendStringInfo(&query, " FROM ");
-		deparseFromExprForRel(&query, foreignrel,
-								&(fdwState->params));
+	/* append FROM clause */
+	appendStringInfo(&query, " FROM ");
+	deparseFromExprForRel(&query, foreignrel,
+							&(fdwState->params));
 
+	if(foreignrel->reloptkind == RELOPT_BASEREL){
 		/* append WHERE clauses */
 		if (fdwState->where_clause)
 			appendStringInfo(&query, "%s", fdwState->where_clause);	
