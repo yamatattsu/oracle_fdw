@@ -1,0 +1,212 @@
+/*
+ * Test local estimate for join pushdown
+
+Note: Create testcost1 and testcost2 on Oracle before execute this regression test.
+
+CREATE TABLE TESTCOST1(id integer, val integer, primary key(id)) SEGMENT CREATION IMMEDIATE;
+CREATE TABLE TESTCOST2(id integer, val integer, primary key(id)) SEGMENT CREATION IMMEDIATE;
+ */
+SET client_min_messages = WARNING;
+set enable_material to off;
+CREATE FOREIGN TABLE fora_TESTCOST1 (
+    id  integer OPTIONS (key 'yes'),
+    val integer
+) SERVER oracle OPTIONS (table 'TESTCOST1');;
+CREATE FOREIGN TABLE fora_TESTCOST2 (
+    id  integer OPTIONS (key 'yes'),
+    val integer
+) SERVER oracle OPTIONS (table 'TESTCOST2');;
+/* High cardinality */
+INSERT INTO fora_TESTCOST1(id, val) SELECT i, i from GENERATE_SERIES(1, 10000 ) as i;
+INSERT INTO fora_TESTCOST2(id, val) SELECT * FROM fora_TESTCOST1;
+SELECT * FROM fora_testcost1 order by 1 LIMIT 10;
+ id | val 
+----+-----
+  1 |   1
+  2 |   2
+  3 |   3
+  4 |   4
+  5 |   5
+  6 |   6
+  7 |   7
+  8 |   8
+  9 |   9
+ 10 |  10
+(10 rows)
+
+SELECT * FROM fora_testcost2 order by 1 LIMIT 10;
+ id | val 
+----+-----
+  1 |   1
+  2 |   2
+  3 |   3
+  4 |   4
+  5 |   5
+  6 |   6
+  7 |   7
+  8 |   8
+  9 |   9
+ 10 |  10
+(10 rows)
+
+select relname, relpages, reltuples from pg_class where relname like '%testcost%';
+    relname     | relpages | reltuples 
+----------------+----------+-----------
+ fora_testcost1 |        0 |         0
+ fora_testcost2 |        0 |         0
+(2 rows)
+
+analyze fora_testcost1;
+analyze fora_testcost2;
+select relname, relpages, reltuples from pg_class where relname like '%testcost%';
+    relname     | relpages | reltuples 
+----------------+----------+-----------
+ fora_testcost1 |       42 |     10000
+ fora_testcost2 |       42 |     10000
+(2 rows)
+
+EXPLAIN (verbose, costs off) SELECT T1.val FROM fora_TESTCOST1 as T1, fora_TESTCOST2 as T2 WHERE T1.val = T2.val;
+                                                                    QUERY PLAN                                                                     
+---------------------------------------------------------------------------------------------------------------------------------------------------
+ Foreign Scan
+   Output: t1.val
+   Oracle query: SELECT /*6549f17a65914f02e9a1f8a5c8904ccc*/ r1."VAL" FROM ("TESTCOST1" r1 INNER JOIN "TESTCOST2" r2 ON (((r1."VAL" = r2."VAL"))))
+   Oracle plan: SELECT STATEMENT
+   Oracle plan:   HASH JOIN   (condition "R1"."VAL"="R2"."VAL")
+   Oracle plan:     TABLE ACCESS FULL TESTCOST1
+   Oracle plan:     TABLE ACCESS FULL TESTCOST2
+(7 rows)
+
+SELECT count(T1.val) FROM fora_TESTCOST1 as T1, fora_TESTCOST2 as T2 WHERE T1.val = T2.val;
+ count 
+-------
+ 10000
+(1 row)
+
+EXPLAIN (verbose, costs off) SELECT T1.val FROM fora_TESTCOST1 as T1, fora_TESTCOST2 as T2 WHERE T1.val = T2.val and t1.val = 1;
+                                                     QUERY PLAN                                                      
+---------------------------------------------------------------------------------------------------------------------
+ Nested Loop
+   Output: t1.val
+   ->  Foreign Scan on public.fora_testcost1 t1
+         Output: t1.id, t1.val
+         Oracle query: SELECT /*fa47bf53542f01db069c4e6c604a4a90*/ r1."VAL" FROM "TESTCOST1" r1 WHERE (r1."VAL" = 1)
+         Oracle plan: SELECT STATEMENT
+         Oracle plan:   TABLE ACCESS FULL TESTCOST1  (filter "R1"."VAL"=1)
+   ->  Foreign Scan on public.fora_testcost2 t2
+         Output: t2.id, t2.val
+         Oracle query: SELECT /*225ae9c1cb7314fb3c2ed706ba52eb3c*/ r2."VAL" FROM "TESTCOST2" r2 WHERE (r2."VAL" = 1)
+         Oracle plan: SELECT STATEMENT
+         Oracle plan:   TABLE ACCESS FULL TESTCOST2  (filter "R2"."VAL"=1)
+(12 rows)
+
+SELECT count(T1.val) FROM fora_TESTCOST1 as T1, fora_TESTCOST2 as T2 WHERE T1.val = T2.val and t1.val = 1;
+ count 
+-------
+     1
+(1 row)
+
+/* Clean up */
+DELETE FROM fora_testcost1;
+DELETE FROM fora_testcost2;
+/* Low cardinality */
+INSERT INTO fora_TESTCOST1(id, val) SELECT i, i/100 from GENERATE_SERIES(1, 10000 ) as i;
+INSERT INTO fora_TESTCOST2(id, val) SELECT * FROM fora_TESTCOST1;
+SELECT * FROM fora_testcost1 order by 1 LIMIT 10;
+ id | val 
+----+-----
+  1 |   0
+  2 |   0
+  3 |   0
+  4 |   0
+  5 |   0
+  6 |   0
+  7 |   0
+  8 |   0
+  9 |   0
+ 10 |   0
+(10 rows)
+
+SELECT * FROM fora_testcost2 order by 1 LIMIT 10;
+ id | val 
+----+-----
+  1 |   0
+  2 |   0
+  3 |   0
+  4 |   0
+  5 |   0
+  6 |   0
+  7 |   0
+  8 |   0
+  9 |   0
+ 10 |   0
+(10 rows)
+
+select relname, relpages, reltuples from pg_class where relname like '%testcost%';
+    relname     | relpages | reltuples 
+----------------+----------+-----------
+ fora_testcost1 |       42 |     10000
+ fora_testcost2 |       42 |     10000
+(2 rows)
+
+analyze fora_testcost1;
+analyze fora_testcost2;
+select relname, relpages, reltuples from pg_class where relname like '%testcost%';
+    relname     | relpages | reltuples 
+----------------+----------+-----------
+ fora_testcost1 |       42 |     10000
+ fora_testcost2 |       42 |     10000
+(2 rows)
+
+EXPLAIN (verbose, costs off) SELECT T1.val FROM fora_TESTCOST1 as T1, fora_TESTCOST2 as T2 WHERE T1.val = T2.val;
+                                              QUERY PLAN                                              
+------------------------------------------------------------------------------------------------------
+ Hash Join
+   Output: t1.val
+   Hash Cond: (t1.val = t2.val)
+   ->  Foreign Scan on public.fora_testcost1 t1
+         Output: t1.id, t1.val
+         Oracle query: SELECT /*9e43e6de927284cf0177792592887003*/ r1."VAL" FROM "TESTCOST1" r1
+         Oracle plan: SELECT STATEMENT
+         Oracle plan:   TABLE ACCESS FULL TESTCOST1
+   ->  Hash
+         Output: t2.val
+         ->  Foreign Scan on public.fora_testcost2 t2
+               Output: t2.val
+               Oracle query: SELECT /*5e26b7226815111d0285d2d57e09ba56*/ r2."VAL" FROM "TESTCOST2" r2
+               Oracle plan: SELECT STATEMENT
+               Oracle plan:   TABLE ACCESS FULL TESTCOST2
+(15 rows)
+
+SELECT count(T1.val) FROM fora_TESTCOST1 as T1, fora_TESTCOST2 as T2 WHERE T1.val = T2.val;
+ count  
+--------
+ 999802
+(1 row)
+
+EXPLAIN (verbose, costs off) SELECT T1.val FROM fora_TESTCOST1 as T1, fora_TESTCOST2 as T2 WHERE T1.val = T2.val and t1.val = 1;
+                                                     QUERY PLAN                                                      
+---------------------------------------------------------------------------------------------------------------------
+ Nested Loop
+   Output: t1.val
+   ->  Foreign Scan on public.fora_testcost1 t1
+         Output: t1.id, t1.val
+         Oracle query: SELECT /*fa47bf53542f01db069c4e6c604a4a90*/ r1."VAL" FROM "TESTCOST1" r1 WHERE (r1."VAL" = 1)
+         Oracle plan: SELECT STATEMENT
+         Oracle plan:   TABLE ACCESS FULL TESTCOST1  (filter "R1"."VAL"=1)
+   ->  Foreign Scan on public.fora_testcost2 t2
+         Output: t2.id, t2.val
+         Oracle query: SELECT /*225ae9c1cb7314fb3c2ed706ba52eb3c*/ r2."VAL" FROM "TESTCOST2" r2 WHERE (r2."VAL" = 1)
+         Oracle plan: SELECT STATEMENT
+         Oracle plan:   TABLE ACCESS FULL TESTCOST2  (filter "R2"."VAL"=1)
+(12 rows)
+
+SELECT count(T1.val) FROM fora_TESTCOST1 as T1, fora_TESTCOST2 as T2 WHERE T1.val = T2.val and t1.val = 1;
+ count 
+-------
+ 10000
+(1 row)
+
+/* Clean up */
+DELETE FROM fora_testcost1;
+DELETE FROM fora_testcost2;

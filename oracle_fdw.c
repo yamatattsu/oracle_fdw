@@ -1003,6 +1003,7 @@ oracleGetForeignJoinPaths(PlannerInfo *root,
 	struct OracleFdwState *fdwState;
 
 	ForeignPath *joinpath;
+	double      joinclauses_selectivity;
 	double      rows;
 	Cost        startup_cost;
 	Cost        total_cost;
@@ -1061,13 +1062,21 @@ oracleGetForeignJoinPaths(PlannerInfo *root,
 		return;
 	}
 
-	/* ToDo: cost estimations for join relation */
-	rows = 1;
-	startup_cost = 1;
-	total_cost = 1;
+	/* cost estimations for join relation */
+	elog(DEBUG1, "innerrel->tuples: %lf", innerrel->tuples);
+	elog(DEBUG1, "outerrel->tuples: %lf", outerrel->tuples);
+	elog(DEBUG1, "joinrel->tuples : %lf", joinrel->tuples);
+
+	joinclauses_selectivity = clauselist_selectivity(root, fdwState->joinclauses, 0, JOIN_INNER, extra->sjinfo);
+	rows = clamp_row_est(innerrel->tuples * outerrel->tuples * joinclauses_selectivity);
+
+	elog(DEBUG1, "joinclauses selectivity : %lf", joinclauses_selectivity);
+	elog(DEBUG1, "joinrel->rows   : %lf", rows);
+
+	startup_cost = 10000.0;
+	total_cost = startup_cost + rows * 10.0;
 
 	joinrel->rows = rows;
-	joinrel->reltarget->width = 1;
 
 	fdwState->startup_cost = startup_cost;
 	fdwState->total_cost = total_cost;
