@@ -1435,7 +1435,7 @@ oracleIterateForeignScan(ForeignScanState *node)
 		if (node->ss.ss_currentRelation)
 			elog(DEBUG3, "oracle_fdw: get next row in foreign table scan on %d", RelationGetRelid(node->ss.ss_currentRelation));
 		else
-			elog(DEBUG1, "oracle_fdw: get next row in foreign join");
+			elog(DEBUG3, "oracle_fdw: get next row in foreign join");
 
 		/* fetch the next result row */
 		have_result = oracleFetchNext(fdw_state->session);
