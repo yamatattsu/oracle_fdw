@@ -1004,7 +1004,7 @@ oracleGetForeignJoinPaths(PlannerInfo *root,
 
 	ForeignPath *joinpath;
 	double      joinclauses_selectivity;
-	double      rows;
+	double      rows;				/* estimated rows (returned rows) */
 	Cost        startup_cost;
 	Cost        total_cost;
 	/*Path       *epq_path;*/		/* Path to create plan to be executed when
@@ -1063,21 +1063,35 @@ oracleGetForeignJoinPaths(PlannerInfo *root,
 	}
 
 	/* cost estimations for join relation */
-	elog(DEBUG1, "innerrel->tuples: %lf", innerrel->tuples);
-	elog(DEBUG1, "outerrel->tuples: %lf", outerrel->tuples);
-	elog(DEBUG1, "joinrel->tuples : %lf", joinrel->tuples);
+	/* if innerrel->pages > 0 and outerrel->pages, there ware ANALYZE; use the row count estimates */
+	if (outerrel->pages > 0 && innerrel->pages > 0)
+	{
+		elog(DEBUG1, "innerrel->tuples: %lf", innerrel->tuples);
+		elog(DEBUG1, "outerrel->tuples: %lf", outerrel->tuples);
+		elog(DEBUG1, "joinrel->tuples : %lf", joinrel->tuples);
 
-	joinclauses_selectivity = clauselist_selectivity(root, fdwState->joinclauses, 0, JOIN_INNER, extra->sjinfo);
-	rows = clamp_row_est(innerrel->tuples * outerrel->tuples * joinclauses_selectivity);
+		joinclauses_selectivity = clauselist_selectivity(root, fdwState->joinclauses, 0, JOIN_INNER, extra->sjinfo);
 
-	elog(DEBUG1, "joinclauses selectivity : %lf", joinclauses_selectivity);
-	elog(DEBUG1, "joinrel->rows   : %lf", rows);
+		/* estimate how conditions will influence the row count */
+		rows = clamp_row_est(innerrel->tuples * outerrel->tuples * joinclauses_selectivity);
 
+		elog(DEBUG1, "joinclauses selectivity : %lf", joinclauses_selectivity);
+		elog(DEBUG1, "joinrel->rows   : %lf", rows);
+	}
+	else
+	{
+		/* There is no statistics, use 1000 as a default returned rows */
+		rows = 1000.0;
+	}
+
+	/* use a random "high" value for cost which is similar to oracleGetForeignRelsize */
 	startup_cost = 10000.0;
+
+	/* estimate total cost as startup cost + (returned rows) * 10.0 */
 	total_cost = startup_cost + rows * 10.0;
 
+	/* store cost estimation results */
 	joinrel->rows = rows;
-
 	fdwState->startup_cost = startup_cost;
 	fdwState->total_cost = total_cost;
 
