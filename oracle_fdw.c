@@ -1001,6 +1001,8 @@ oracleGetForeignJoinPaths(PlannerInfo *root,
 {
 
 	struct OracleFdwState *fdwState;
+    struct OracleFdwState *fdwState_o;
+    struct OracleFdwState *fdwState_i;
 
 	ForeignPath *joinpath;
 	double      joinclauses_selectivity;
@@ -1084,8 +1086,13 @@ oracleGetForeignJoinPaths(PlannerInfo *root,
 		rows = 1000.0;
 	}
 
-	/* use a random "high" value for cost which is similar to oracleGetForeignRelsize */
-	startup_cost = 10000.0;
+    fdwState_o = (struct OracleFdwState *) outerrel->fdw_private;
+    fdwState_i = (struct OracleFdwState *) innerrel->fdw_private;
+
+	/* use outerrel's startup_cost and innerrels's startup_cost for joinrel's cost */
+	elog(DEBUG1, "outerrel->startup_cost: %lf", fdwState_o->startup_cost);
+	elog(DEBUG1, "innerrel->startup_cost: %lf", fdwState_i->startup_cost);
+	startup_cost = fdwState_o->startup_cost + fdwState_i->startup_cost;
 
 	/* estimate total cost as startup cost + (returned rows) * 10.0 */
 	total_cost = startup_cost + rows * 10.0;
